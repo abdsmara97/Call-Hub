@@ -38,6 +38,18 @@ class LoginForm extends Form
             ]);
         }
 
+        // Suspended accounts keep their history but must not hold a session.
+        // Checked after the password so the response cannot be used to probe
+        // which addresses belong to suspended staff.
+        if (! Auth::user()->isActive()) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'form.email' => __('This account has been suspended. Contact your administrator.'),
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 
