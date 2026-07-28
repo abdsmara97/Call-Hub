@@ -3,10 +3,13 @@
 use App\Models\User;
 use Livewire\Volt\Volt;
 
-test('login screen can be rendered', function () {
-    $response = $this->get('/login');
+/*
+ * There is no public registration and no dashboard: accounts are admin-issued
+ * and every authenticated route lands on the hub.
+ */
 
-    $response
+test('login screen can be rendered', function () {
+    $this->get(route('login'))
         ->assertOk()
         ->assertSeeVolt('pages.auth.login');
 });
@@ -14,15 +17,12 @@ test('login screen can be rendered', function () {
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->create();
 
-    $component = Volt::test('pages.auth.login')
+    Volt::test('pages.auth.login')
         ->set('form.email', $user->email)
-        ->set('form.password', 'password');
-
-    $component->call('login');
-
-    $component
+        ->set('form.password', 'password')
+        ->call('login')
         ->assertHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('hub', absolute: false));
 
     $this->assertAuthenticated();
 });
@@ -30,43 +30,56 @@ test('users can authenticate using the login screen', function () {
 test('users can not authenticate with invalid password', function () {
     $user = User::factory()->create();
 
-    $component = Volt::test('pages.auth.login')
+    Volt::test('pages.auth.login')
         ->set('form.email', $user->email)
-        ->set('form.password', 'wrong-password');
-
-    $component->call('login');
-
-    $component
-        ->assertHasErrors()
+        ->set('form.password', 'wrong-password')
+        ->call('login')
+        ->assertHasErrors('form.email')
         ->assertNoRedirect();
 
     $this->assertGuest();
 });
 
-test('navigation menu can be rendered', function () {
+test('a suspended account cannot hold a session', function () {
+    $user = User::factory()->suspended()->create();
+
+    Volt::test('pages.auth.login')
+        ->set('form.email', $user->email)
+        ->set('form.password', 'password')
+        ->call('login')
+        ->assertHasErrors('form.email');
+
+    $this->assertGuest();
+});
+
+test('an account suspended mid-session loses it on the next request', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
-    $response = $this->get('/dashboard');
+    $user->forceFill(['status' => \App\Enums\UserStatus::Suspended->value])->save();
 
-    $response
-        ->assertOk()
-        ->assertSeeVolt('layout.navigation');
+    $this->get(route('hub'))->assertRedirect(route('login'));
+
+    $this->assertGuest();
+});
+
+test('a temporary password blocks every screen but the rotation', function () {
+    $user = User::factory()->mustRotatePassword()->create();
+
+    $this->actingAs($user);
+
+    $this->get(route('hub'))->assertRedirect(route('password.rotate'));
+    $this->get(route('directory'))->assertRedirect(route('password.rotate'));
+    $this->get(route('password.rotate'))->assertOk();
 });
 
 test('users can logout', function () {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    $component = Volt::test('layout.navigation');
-
-    $component->call('logout');
-
-    $component
-        ->assertHasNoErrors()
-        ->assertRedirect('/');
+    $this->actingAs($user)
+        ->post(route('logout'))
+        ->assertRedirect(route('login'));
 
     $this->assertGuest();
 });
