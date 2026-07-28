@@ -1,8 +1,15 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+/*
+ * The escalation backstop. Delayed jobs do the real work; this catches anything
+ * that slipped through so an unacknowledged emergency is never silently dropped.
+ */
+Schedule::command('emergency:sweep')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Sessions and expired temporary data.
+Schedule::command('auth:clear-resets')->daily();
