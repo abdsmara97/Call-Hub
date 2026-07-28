@@ -1,12 +1,97 @@
-@import 'tailwindcss';
+@import './tokens.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source "../**/*.blade.php";
-@source "../**/*.js";
-@source "../**/*.vue";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        @apply bg-canvas text-content font-sans antialiased;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    /* -------------------------------------------------------------- buttons */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-md border border-transparent
+               px-3 py-2 text-sm font-semibold transition-colors duration-fast ease-standard
+               disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .btn-primary {
+        @apply btn bg-brand text-brand-on hover:bg-brand-hover active:bg-brand-active
+               disabled:bg-brand-disabled disabled:text-content-subtle;
+    }
+
+    .btn-secondary {
+        @apply btn border-line-strong bg-surface text-content hover:bg-surface-hover
+               active:bg-surface-active;
+    }
+
+    .btn-ghost {
+        @apply btn text-content-muted hover:bg-surface-hover hover:text-content;
+    }
+
+    .btn-emergency {
+        @apply btn bg-emergency-solid text-emergency-on hover:bg-emergency-active;
+    }
+
+    /* ---------------------------------------------------------------- forms */
+    .field {
+        @apply w-full rounded-md border-line bg-surface px-3 py-2 text-base text-content
+               placeholder:text-content-subtle
+               focus:border-brand focus:ring-2 focus:ring-brand/30
+               disabled:bg-surface-sunken disabled:text-content-subtle;
+    }
+
+    .field-error {
+        @apply mt-1 text-xs font-medium text-emergency-text;
+    }
+
+    .label {
+        @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-content-muted;
+    }
+
+    /* --------------------------------------------------------------- panels */
+    .panel {
+        @apply rounded-lg border border-line bg-surface shadow-xs;
+    }
+
+    /* --------------------------------------------------------------- badges */
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold
+               uppercase tracking-wide;
+    }
+
+    .badge-brand {
+        @apply badge bg-brand-tint text-brand-text;
+    }
+
+    .badge-neutral {
+        @apply badge bg-surface-sunken text-content-muted;
+    }
+
+    .badge-emergency {
+        @apply badge bg-emergency-solid text-emergency-on;
+    }
+
+    /* ------------------------------------------------------------ nav items */
+    /* Navigation is intentionally denser than the reading surfaces. */
+    .nav-item {
+        @apply flex items-center gap-2 rounded-sm px-2 py-1 text-sm text-content-muted
+               transition-colors duration-fast hover:bg-surface-hover hover:text-content;
+    }
+
+    .nav-item-active {
+        @apply nav-item bg-brand-tint-strong font-semibold text-brand-text
+               hover:bg-brand-tint-strong hover:text-brand-text;
+    }
 }

@@ -60,6 +60,44 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Message attachments. Private in every environment — files are only
+         * ever reached through a signed URL issued after a membership check,
+         * never by guessing a path. Set HUB_ATTACHMENT_DISK=s3 in production.
+         */
+        'attachments' => [
+            'driver' => env('HUB_ATTACHMENT_DRIVER', 'local'),
+            'root' => storage_path('app/private/attachments'),
+            'visibility' => 'private',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_ATTACHMENT_BUCKET', env('AWS_BUCKET')),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        /*
+         * Profile photos are deliberately public — they render in every message
+         * row and signing each one would be a needless round trip.
+         */
+        'avatars' => [
+            'driver' => env('HUB_AVATAR_DRIVER', 'local'),
+            'root' => storage_path('app/public/avatars'),
+            'url' => env('APP_URL').'/storage/avatars',
+            'visibility' => 'public',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_AVATAR_BUCKET', env('AWS_BUCKET')),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
