@@ -34,6 +34,27 @@
                     <span class="hidden sm:inline">Directory</span>
                 </a>
 
+                @php
+                    // A plain partial, not a Livewire component, so this count
+                    // refreshes on navigation rather than live. The desktop
+                    // notification is what carries urgency.
+                    $unreadMentions = \App\Models\MessageMention::query()
+                        ->where('user_id', $user->id)
+                        ->unread()
+                        ->count();
+                @endphp
+
+                <a href="{{ route('mentions') }}" class="{{ $navLink(request()->routeIs('mentions')) }}">
+                    <x-icon name="at-symbol" class="h-4 w-4" />
+                    <span class="hidden sm:inline">Mentions</span>
+                    @if ($unreadMentions > 0)
+                        <span class="badge-brand shrink-0 tabular-nums"
+                              aria-label="{{ $unreadMentions }} unread {{ Str::plural('mention', $unreadMentions) }}">
+                            <span aria-hidden="true">{{ $unreadMentions > 99 ? '99+' : $unreadMentions }}</span>
+                        </span>
+                    @endif
+                </a>
+
                 <a href="{{ route('saved') }}" class="{{ $navLink(request()->routeIs('saved')) }}">
                     <x-icon name="bookmark" class="h-4 w-4" />
                     <span class="hidden sm:inline">Saved</span>

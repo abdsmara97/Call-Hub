@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\Availability;
+use App\Enums\MessageNotificationLevel;
 use App\Models\DndWindow;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -40,7 +41,7 @@ class ProfileSettings extends Component
     public string $contactStatus = '';
 
     // ------------------------------------------------------- notifications
-    public bool $notify_on_message = true;
+    public string $message_notifications = MessageNotificationLevel::All->value;
 
     public string $notificationStatus = '';
 
@@ -69,20 +70,36 @@ class ProfileSettings extends Component
         $this->phone = $user->phone;
         $this->status_message = $user->status_message;
         $this->availability = ($user->availability ?? Availability::Available)->value;
-        $this->notify_on_message = (bool) $user->notify_on_message;
+        $this->message_notifications = $user->message_notifications->value;
     }
 
     /**
-     * A single switch saves itself — making someone hunt for a Save button after
-     * flicking one toggle is how preferences end up not stuck.
+     * The setting saves itself — making someone hunt for a Save button after
+     * picking one radio is how preferences end up not stuck.
+     *
+     * Validated rather than trusted: a string property accepts whatever the
+     * client sends, so this cannot go straight into the model the way the old
+     * bool-typed toggle safely could.
      */
-    public function updatedNotifyOnMessage(bool $value): void
+    public function updatedMessageNotifications(string $value): void
     {
-        $this->user()->forceFill(['notify_on_message' => $value])->save();
+        $level = MessageNotificationLevel::tryFrom($value);
 
-        $this->notificationStatus = $value
-            ? 'You will be notified about new messages.'
-            : 'Message notifications are off. Emergencies will still reach you.';
+        if ($level === null) {
+            // Put the property back to what is actually stored.
+            $this->message_notifications = $this->user()->message_notifications->value;
+            $this->notificationStatus = '';
+
+            return;
+        }
+
+        $this->user()->forceFill(['message_notifications' => $level->value])->save();
+
+        $this->notificationStatus = match ($level) {
+            MessageNotificationLevel::All => 'You will be notified about every message.',
+            MessageNotificationLevel::Mentions => 'You will only be notified when someone mentions you.',
+            MessageNotificationLevel::None => 'Message notifications are off. Emergencies will still reach you.',
+        };
     }
 
     private function user(): User

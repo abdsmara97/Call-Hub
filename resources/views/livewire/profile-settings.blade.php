@@ -410,26 +410,35 @@
                      from the browser permission above, which only says whether the
                      device is willing to display it. --}}
                 <div class="mt-4 border-t border-line pt-4">
-                    <label for="notify-on-message" class="flex cursor-pointer items-start gap-3">
-                        <input id="notify-on-message" type="checkbox"
-                               wire:model.live="notify_on_message"
-                               class="mt-0.5 rounded border-line-strong text-brand focus:ring-brand/40">
-                        <span class="min-w-0">
-                            <span class="block text-sm font-medium text-content">
-                                Notify me about new messages
-                            </span>
-                            <span class="block text-xs text-content-muted">
-                                Pops up when someone messages you and this tab is in the background.
-                                Nothing pops up while you are looking at the Hub — the conversation
-                                list already flashes. Quiet hours below silence these; emergencies
-                                ignore quiet hours by design.
-                            </span>
-                        </span>
-                    </label>
+                    <fieldset>
+                        <legend class="text-sm font-medium text-content">Tell me about new messages</legend>
+                        <p class="mt-0.5 text-xs text-content-muted">
+                            Pop-ups appear only when this tab is in the background. Nothing pops up
+                            while you are looking at the Hub — the conversation list already flashes.
+                            Quiet hours below silence all of these; emergencies ignore quiet hours by
+                            design.
+                        </p>
+
+                        <div class="mt-3 space-y-2">
+                            @foreach (\App\Enums\MessageNotificationLevel::cases() as $level)
+                                <label for="notify-{{ $level->value }}"
+                                       class="flex cursor-pointer items-start gap-3">
+                                    <input id="notify-{{ $level->value }}" type="radio"
+                                           value="{{ $level->value }}"
+                                           wire:model.live="message_notifications"
+                                           class="mt-0.5 border-line-strong text-brand focus:ring-brand/40">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm text-content">{{ $level->label() }}</span>
+                                        <span class="block text-xs text-content-muted">{{ $level->description() }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </fieldset>
 
                     @if ($notificationStatus)
                         <p role="status" aria-live="polite"
-                           class="mt-2 flex items-center gap-1.5 text-xs text-brand-text">
+                           class="mt-3 flex items-center gap-1.5 text-xs text-brand-text">
                             <x-icon name="check-circle" class="h-3.5 w-3.5" />
                             {{ $notificationStatus }}
                         </p>

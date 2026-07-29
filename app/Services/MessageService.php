@@ -10,6 +10,7 @@ use App\Events\ReadCursorUpdated;
 use App\Models\Attachment;
 use App\Models\Emergency;
 use App\Models\Message;
+use App\Models\MessageMention;
 use App\Models\MessageReaction;
 use App\Models\Room;
 use App\Models\RoomMember;
@@ -20,6 +21,10 @@ use Illuminate\Support\Facades\Storage;
 
 class MessageService
 {
+    public function __construct(
+        private readonly MentionParser $mentions = new MentionParser,
+    ) {}
+
     /**
      * @param  array<int, UploadedFile>  $uploads
      */
@@ -50,6 +55,9 @@ class MessageService
                 $this->storeAttachment($message, $upload);
             }
 
+            $message->setRelation('room', $room);
+            $this->syncMentions($message);
+
             $room->forceFill(['last_message_at' => now()])->save();
 
             // Writing your own message counts as having read it.
@@ -60,7 +68,7 @@ class MessageService
 
         broadcast(new MessageSent($message))->toOthers();
 
-        return $message->load(['author', 'attachments']);
+        return $message->load(['author', 'attachments', 'mentions']);
     }
 
     public function edit(Message $message, ?string $body): Message
@@ -75,6 +83,10 @@ class MessageService
             'body' => $body,
             'edited_at' => now(),
         ])->save();
+
+        // Recomputed, not left alone: editing a name out has to stop the ping,
+        // and editing one in has to start it.
+        $this->syncMentions($message);
 
         broadcast(new MessageUpdated($message))->toOthers();
 
@@ -93,6 +105,54 @@ class MessageService
         $message->delete();
 
         broadcast(new MessageDeleted($id, $roomId))->toOthers();
+    }
+
+    /**
+     * Records who a message names, and where.
+     *
+     * Candidates are queried fresh rather than read off a loaded relation, so a
+     * caller holding a stale room cannot widen who gets mentioned.
+     *
+     * Existing rows are diffed rather than deleted and reinserted, which keeps
+     * `read_at` on any mention that survived an edit — fixing a typo must not
+     * resurface a mention the recipient already dealt with.
+     */
+    public function syncMentions(Message $message): void
+    {
+        $spans = blank($message->body)
+            ? []
+            : $this->mentions->parse(
+                $message->body,
+                $message->room->members()->get(['users.id', 'users.name']),
+            );
+
+        $existing = MessageMention::query()
+            ->where('message_id', $message->getKey())
+            ->get()
+            ->keyBy(fn (MessageMention $m) => $m->user_id.':'.$m->start);
+
+        $keep = [];
+
+        foreach ($spans as $span) {
+            $key = $span['user_id'].':'.$span['start'];
+            $keep[] = $key;
+
+            if ($existing->has($key)) {
+                continue;
+            }
+
+            MessageMention::create([
+                'message_id' => $message->getKey(),
+                'user_id' => $span['user_id'],
+                'start' => $span['start'],
+                'length' => $span['length'],
+            ]);
+        }
+
+        $existing->reject(fn ($m, string $key) => in_array($key, $keep, true))
+            ->each(fn (MessageMention $m) => $m->delete());
+
+        $message->unsetRelation('mentions');
     }
 
     /**

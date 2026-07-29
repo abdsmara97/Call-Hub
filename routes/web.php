@@ -14,6 +14,7 @@ use App\Livewire\Admin\UserManager;
 use App\Livewire\Auth\RotatePassword;
 use App\Livewire\Directory;
 use App\Livewire\Hub\Workspace;
+use App\Livewire\Mentions;
 use App\Livewire\ProfileSettings;
 use App\Livewire\SavedMessages;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::get('hub/dm/{user}', StartDirectMessageController::class)->name('dm.start');
 
     Route::get('directory', Directory::class)->name('directory');
+    Route::get('mentions', Mentions::class)->name('mentions');
     Route::get('saved', SavedMessages::class)->name('saved');
     Route::get('profile', ProfileSettings::class)->name('profile');
 

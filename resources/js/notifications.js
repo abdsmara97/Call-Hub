@@ -39,6 +39,14 @@ function announce(text) {
 }
 
 function title(detail) {
+    // Being named is the reason the pop-up is worth interrupting for, so it
+    // leads.
+    if (detail.isMention) {
+        return detail.isDm
+            ? `${detail.sender} mentioned you`
+            : `${detail.sender} mentioned you in ${detail.room}`;
+    }
+
     // In a DM the room name is the other person, so repeating the sender reads
     // as "Ivan Petrov — Ivan Petrov".
     return detail.isDm ? detail.sender : `${detail.sender} in ${detail.room}`;
@@ -49,7 +57,7 @@ export function registerMessageNotifications(Alpine) {
         notify(detail = {}) {
             const heading = title(detail);
 
-            announce(`New message. ${heading}. ${detail.body || ''}`);
+            announce(`${detail.isMention ? 'You were mentioned' : 'New message'}. ${heading}. ${detail.body || ''}`);
 
             // The sidebar already blinks the room; a pop-up on top of a visible
             // window is just noise.

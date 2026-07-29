@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\Availability;
+use App\Enums\MessageNotificationLevel;
 use App\Enums\UserStatus;
 use App\Models\Administration;
 use App\Models\Company;
@@ -36,7 +37,7 @@ class UserFactory extends Factory
             'job_title' => fake()->jobTitle(),
             'status' => UserStatus::Active->value,
             'availability' => Availability::Available->value,
-            'notify_on_message' => true,
+            'message_notifications' => MessageNotificationLevel::All->value,
             'must_change_password' => false,
         ];
     }

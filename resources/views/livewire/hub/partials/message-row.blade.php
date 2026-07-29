@@ -52,9 +52,8 @@
             @else
                 {{-- A poll's body is its question, which the card already shows. --}}
                 @if (filled($message->body) && ! $message->poll)
-                    {{-- Plain text with line breaks. User content is never rendered as HTML. --}}
-                    <div class="mt-0.5 whitespace-pre-wrap break-words text-base
-                                {{ $isEmergency ? 'font-medium text-content' : 'text-content' }}">{{ $message->body }}</div>
+                    <x-message-body :message="$message"
+                                    class="mt-0.5 text-base {{ $isEmergency ? 'font-medium text-content' : 'text-content' }}" />
                 @endif
 
                 @if ($message->attachments->isNotEmpty())
@@ -155,7 +154,7 @@
                                 <span class="text-xs font-semibold">{{ $reply->author->name }}</span>
                                 <time datetime="{{ $reply->created_at->toIso8601String() }}"
                                       class="ml-1.5 text-2xs text-content-subtle">{{ $reply->created_at->format('H:i') }}</time>
-                                <div class="whitespace-pre-wrap break-words text-sm">{{ $reply->body }}</div>
+                                <x-message-body :message="$reply" class="text-sm" />
                             </div>
                         </li>
                     @endforeach

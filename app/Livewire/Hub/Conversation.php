@@ -120,9 +120,11 @@ class Conversation extends Component
                 'poll.options',
                 'poll.votes',
                 'reactions.user',
+                'mentions',
                 'replies.author',
                 'replies.attachments',
                 'replies.reactions.user',
+                'replies.mentions',
             ])
             ->withCount('replies')
             ->latest('id')
@@ -162,6 +164,29 @@ class Conversation extends Component
         return $this->room->memberships()
             ->whereNotNull('last_read_message_id')
             ->pluck('last_read_message_id', 'user_id')
+            ->all();
+    }
+
+    /**
+     * Who the composer will offer after an '@'.
+     *
+     * Exactly the room's membership, produced under the `view` gate that mount()
+     * already asserted — so there is no user-search endpoint to authorise, and
+     * no way to surface a name from a room the author cannot read.
+     *
+     * @return list<array{id: int, name: string, title: string}>
+     */
+    #[Computed]
+    public function mentionCandidates(): array
+    {
+        return $this->room->members
+            ->sortBy('name')
+            ->map(fn ($member) => [
+                'id' => (int) $member->getKey(),
+                'name' => (string) $member->name,
+                'title' => (string) ($member->job_title ?? ''),
+            ])
+            ->values()
             ->all();
     }
 

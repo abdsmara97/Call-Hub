@@ -77,6 +77,86 @@ class Message extends Model
         return $this->hasMany(MessageReaction::class);
     }
 
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(MessageMention::class);
+    }
+
+    public function mentionsUser(User $user): bool
+    {
+        return $this->relationLoaded('mentions')
+            ? $this->mentions->contains('user_id', $user->getKey())
+            : $this->mentions()->where('user_id', $user->getKey())->exists();
+    }
+
+    /**
+     * The body split into plain runs and mentions, in order.
+     *
+     * The view renders each piece with `{{ }}`, so the app keeps its property of
+     * never emitting raw HTML — highlighting a mention must not become an
+     * escape-then-inject-markup path.
+     *
+     * @return list<array{type: 'text'|'mention', text: string, user_id: int|null}>
+     */
+    public function bodySegments(): array
+    {
+        $body = (string) $this->body;
+
+        if ($body === '') {
+            return [];
+        }
+
+        $mentions = $this->relationLoaded('mentions') ? $this->mentions : $this->mentions()->get();
+
+        if ($mentions->isEmpty()) {
+            return [['type' => 'text', 'text' => $body, 'user_id' => null]];
+        }
+
+        $length = mb_strlen($body);
+        $segments = [];
+        $offset = 0;
+
+        // One span per position: two members sharing a name produce two rows at
+        // the same offset, and the text can only be highlighted once.
+        $spans = $mentions
+            ->sortBy('start')
+            ->unique(fn (MessageMention $m) => $m->start)
+            ->values();
+
+        foreach ($spans as $mention) {
+            $start = (int) $mention->start;
+            $span = (int) $mention->length;
+
+            // Defensive: a row that no longer fits the body is dropped rather
+            // than used to slice garbage out of the middle of a word.
+            if ($start < $offset || $span < 1 || $start + $span > $length) {
+                continue;
+            }
+
+            if ($start > $offset) {
+                $segments[] = [
+                    'type' => 'text',
+                    'text' => mb_substr($body, $offset, $start - $offset),
+                    'user_id' => null,
+                ];
+            }
+
+            $segments[] = [
+                'type' => 'mention',
+                'text' => mb_substr($body, $start, $span),
+                'user_id' => (int) $mention->user_id,
+            ];
+
+            $offset = $start + $span;
+        }
+
+        if ($offset < $length) {
+            $segments[] = ['type' => 'text', 'text' => mb_substr($body, $offset), 'user_id' => null];
+        }
+
+        return $segments;
+    }
+
     /**
      * Reactions grouped for display: one entry per emoji, in the order each was
      * first used, with who reacted and whether the viewer is among them.

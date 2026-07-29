@@ -59,6 +59,8 @@ class SavedMessages extends Component
             ->with([
                 'message.author',
                 'message.room.members',
+                // The rendered body resolves its own mention spans.
+                'message.mentions',
             ])
             ->latest()
             ->paginate(self::PER_PAGE);

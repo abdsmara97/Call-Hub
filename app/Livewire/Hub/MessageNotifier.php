@@ -47,7 +47,7 @@ class MessageNotifier extends Component
     {
         $user = auth()->user();
 
-        if (! $user || ! $user->notify_on_message) {
+        if (! $user || $user->message_notifications->isSilent()) {
             return;
         }
 
@@ -68,7 +68,7 @@ class MessageNotifier extends Component
             return;
         }
 
-        $message = Message::with(['author', 'room'])->find($payload['id'] ?? null);
+        $message = Message::with(['author', 'room', 'mentions'])->find($payload['id'] ?? null);
 
         // Re-authorise rather than trusting the subscription: a socket can
         // outlive the membership that justified it.
@@ -76,10 +76,19 @@ class MessageNotifier extends Component
             return;
         }
 
+        $mentionsMe = $message->mentionsUser($user);
+
+        // "Only when someone mentions me" is the whole point of the middle
+        // setting: everything else stays in the unread counts.
+        if (! $mentionsMe && ! $user->message_notifications->notifiesEverything()) {
+            return;
+        }
+
         $this->dispatch('message-notification',
             sender: $message->author?->name ?? 'A colleague',
             room: $message->room->displayNameFor($user),
             isDm: $message->room->isDm(),
+            isMention: $mentionsMe,
             body: $this->preview($message),
             roomId: $message->room_id,
             url: route('rooms.show', $message->room_id),

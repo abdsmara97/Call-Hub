@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Availability;
+use App\Enums\MessageNotificationLevel;
 use App\Enums\RoomMemberRole;
 use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,7 +35,7 @@ class User extends Authenticatable
         'avatar_path',
         'status_message',
         'availability',
-        'notify_on_message',
+        'message_notifications',
         'last_seen_at',
     ];
 
@@ -50,7 +51,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
-            'notify_on_message' => 'boolean',
+            'message_notifications' => MessageNotificationLevel::class,
             'status' => UserStatus::class,
             'availability' => Availability::class,
         ];

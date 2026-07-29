@@ -220,12 +220,46 @@
             @endif
 
             <form wire:submit="send" class="space-y-2">
-                <label for="composer" class="sr-only">Message {{ $room->displayNameFor($me) }}</label>
-                <textarea id="composer" wire:model="body" rows="2"
-                          placeholder="{{ $emergencyArmed ? 'Describe the emergency…' : 'Write a message…' }}"
-                          @keydown.enter.exact.prevent="$wire.send()"
-                          class="field resize-y text-base
-                                 {{ $emergencyArmed ? '!border-emergency focus:!border-emergency focus:!ring-emergency/30' : '' }}"></textarea>
+                {{-- The '@' autocomplete wraps the textarea. Enter is shared:
+                     while the list is open it picks a name, and only otherwise
+                     does it send — guarding on state beats racing two handlers
+                     on the same element. --}}
+                <div class="relative" x-data="mentionAutocomplete(@js($this->mentionCandidates))">
+                    <label for="composer" class="sr-only">Message {{ $room->displayNameFor($me) }}</label>
+                    <textarea id="composer" wire:model="body" rows="2" x-ref="composer"
+                              placeholder="{{ $emergencyArmed ? 'Describe the emergency…' : 'Write a message…' }}"
+                              x-on:input="scan()"
+                              x-on:click="scan()"
+                              x-on:keydown.arrow-down="open && (($event.preventDefault()), move(1))"
+                              x-on:keydown.arrow-up="open && (($event.preventDefault()), move(-1))"
+                              x-on:keydown.escape="open && (($event.stopPropagation()), close())"
+                              x-on:keydown.tab="open && (($event.preventDefault()), choose())"
+                              @keydown.enter.exact="$event.preventDefault(); open ? choose() : $wire.send()"
+                              x-bind:aria-expanded="open ? 'true' : 'false'"
+                              aria-autocomplete="list"
+                              class="field resize-y text-base
+                                     {{ $emergencyArmed ? '!border-emergency focus:!border-emergency focus:!ring-emergency/30' : '' }}"></textarea>
+
+                    <ul x-show="open" x-cloak
+                        class="absolute bottom-full left-0 z-dropdown mb-1 max-h-56 w-72 overflow-y-auto
+                               rounded-lg border border-line bg-surface-raised p-1 shadow-lg"
+                        role="listbox" aria-label="People in this conversation">
+                        <template x-for="(person, index) in results" :key="person.id">
+                            <li>
+                                <button type="button"
+                                        x-on:click="choose(person)"
+                                        x-on:mouseenter="highlighted = index"
+                                        x-bind:aria-selected="highlighted === index ? 'true' : 'false'"
+                                        role="option"
+                                        class="flex w-full items-baseline gap-2 rounded px-2 py-1.5 text-left"
+                                        x-bind:class="highlighted === index ? 'bg-brand-tint text-brand-text' : 'hover:bg-surface-hover'">
+                                    <span class="truncate text-sm font-medium" x-text="person.name"></span>
+                                    <span class="truncate text-2xs text-content-muted" x-text="person.title"></span>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
                 <x-input-error :messages="$errors->get('body')" />
 
                 @if ($uploads)

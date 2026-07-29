@@ -140,8 +140,8 @@ it('stays silent for an emergency, which has its own overlay', function () {
         ->assertNotDispatched('message-notification');
 });
 
-it('stays silent when the user has turned message notifications off', function () {
-    $this->me->forceFill(['notify_on_message' => false])->save();
+it('stays silent when the user has set notifications to none', function () {
+    $this->me->forceFill(['message_notifications' => 'none'])->save();
 
     $message = $this->messages->send($this->them, $this->room, 'You will not see this');
 
@@ -208,5 +208,79 @@ it('stops notifying once the user leaves the room', function () {
 it('ignores a payload for a message that no longer exists', function () {
     Livewire::test(MessageNotifier::class)
         ->call('onMessage', ['id' => 999999, 'room_id' => $this->room->id, 'user_id' => $this->them->id])
+        ->assertNotDispatched('message-notification');
+});
+
+// ----------------------------------------------------------------- mentions
+
+it('notifies at the mentions level only when you are actually named', function () {
+    $this->me->forceFill(['message_notifications' => 'mentions'])->save();
+
+    $ordinary = $this->messages->send($this->them, $this->room, 'General chatter');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($ordinary))
+        ->assertNotDispatched('message-notification');
+
+    $named = $this->messages->send($this->them, $this->room, 'Can @Me look at bay two');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($named))
+        ->assertDispatched('message-notification', function ($event, $params) {
+            return $params['isMention'] === true;
+        });
+});
+
+it('marks an ordinary message as not a mention', function () {
+    $message = $this->messages->send($this->them, $this->room, 'General chatter');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($message))
+        ->assertDispatched('message-notification', function ($event, $params) {
+            return $params['isMention'] === false;
+        });
+});
+
+it('still notifies at the all level for a message that names someone else', function () {
+    $third = User::factory()->inAdministration(Administration::first())->create(['name' => 'Grace Lin']);
+    $this->room->members()->attach($third->id, ['joined_at' => now()]);
+
+    $message = $this->messages->send($this->them, $this->room, 'Over to @Grace Lin');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($message))
+        ->assertDispatched('message-notification', function ($event, $params) {
+            return $params['isMention'] === false;
+        });
+});
+
+it('stays silent at the none level even when you are named', function () {
+    $this->me->forceFill(['message_notifications' => 'none'])->save();
+
+    $message = $this->messages->send($this->them, $this->room, 'Urgent @Me please');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($message))
+        ->assertNotDispatched('message-notification');
+});
+
+/*
+ * Emergencies are the one documented bypass of Do Not Disturb. A mention is
+ * not a second one — adding another would devalue the first.
+ */
+it('lets quiet hours silence a mention', function () {
+    $this->me->forceFill(['message_notifications' => 'mentions'])->save();
+
+    DndWindow::create([
+        'user_id' => $this->me->id,
+        'day_of_week' => (int) now()->format('w'),
+        'starts_at' => '00:00:00',
+        'ends_at' => '23:59:59',
+    ]);
+
+    $message = $this->messages->send($this->them, $this->room, 'Urgent @Me please');
+
+    Livewire::test(MessageNotifier::class)
+        ->call('onMessage', payloadFor($message))
         ->assertNotDispatched('message-notification');
 });

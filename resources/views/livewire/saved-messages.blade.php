@@ -80,9 +80,7 @@
                                     </time>
                                 </div>
 
-                                <p class="mt-1.5 whitespace-pre-line break-words text-base text-content">
-                                    {{ $message->body }}
-                                </p>
+                                <x-message-body :message="$message" class="mt-1.5 text-base text-content" />
 
                                 <div class="mt-3 flex flex-wrap items-center gap-2">
                                     <a href="{{ $permalink }}"
