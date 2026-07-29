@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Scout\Searchable;
 
@@ -60,6 +61,15 @@ class Message extends Model
     public function emergency(): BelongsTo
     {
         return $this->belongsTo(Emergency::class);
+    }
+
+    /**
+     * A poll is posted as an ordinary message carrying the question, so it
+     * threads, pins, saves and searches like anything else in the room.
+     */
+    public function poll(): HasOne
+    {
+        return $this->hasOne(Poll::class);
     }
 
     // ----------------------------------------------------------------- scopes

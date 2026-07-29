@@ -6,10 +6,12 @@ use App\Exceptions\EmergencyRateLimited;
 use App\Models\Emergency;
 use App\Models\Message;
 use App\Models\PinnedMessage;
+use App\Models\Poll;
 use App\Models\Room;
 use App\Models\SavedMessage;
 use App\Services\EmergencyService;
 use App\Services\MessageService;
+use App\Services\PollService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -40,6 +42,16 @@ class Conversation extends Component
 
     public string $search = '';
 
+    /** Poll composer. Closed until the user opens it from the composer bar. */
+    public bool $pollOpen = false;
+
+    public string $pollQuestion = '';
+
+    /** @var array<int, string> */
+    public array $pollOptions = ['', ''];
+
+    public string $pollClosesAt = '';
+
     /** @var array<int, bool> */
     public array $openThreads = [];
 
@@ -64,6 +76,7 @@ class Conversation extends Component
             "echo-private:room.{$room},.emergency.sent" => '$refresh',
             "echo-private:room.{$room},.emergency.acknowledged" => '$refresh',
             "echo-private:room.{$room},.emergency.resolved" => '$refresh',
+            "echo-private:room.{$room},.poll.updated" => 'onPollUpdated',
             'emergency-acknowledged' => '$refresh',
         ];
     }
@@ -80,9 +93,18 @@ class Conversation extends Component
         return auth()->user()->membershipFor($this->room);
     }
 
-    /** @return Collection<int, Message> */
+    /**
+     * The room's root messages, newest page first then reversed for display.
+     *
+     * Named `timeline` rather than `messages` on purpose: Livewire treats a
+     * `messages()` method on a component as the custom validation-message hook,
+     * so calling it `messages` made every validation failure in this component
+     * blow up trying to array_merge an Eloquent collection.
+     *
+     * @return Collection<int, Message>
+     */
     #[Computed]
-    public function messages(): Collection
+    public function timeline(): Collection
     {
         return Message::query()
             ->where('room_id', $this->roomId)
@@ -92,6 +114,10 @@ class Conversation extends Component
                 'author',
                 'attachments',
                 'emergency.recipients.user',
+                // Options and votes come along so the tally renders without a
+                // query per poll per row.
+                'poll.options',
+                'poll.votes',
                 'replies.author',
                 'replies.attachments',
             ])
@@ -210,7 +236,7 @@ class Conversation extends Component
 
     private function afterSend(): void
     {
-        unset($this->messages, $this->pinnedEmergencies);
+        unset($this->timeline, $this->pinnedEmergencies);
 
         $this->markRead();
         $this->dispatch('message-received');
@@ -263,7 +289,7 @@ class Conversation extends Component
         $messages->edit($message, $this->editBody);
 
         $this->reset('editing', 'editBody');
-        unset($this->messages);
+        unset($this->timeline);
     }
 
     public function cancelEdit(): void
@@ -279,7 +305,7 @@ class Conversation extends Component
 
         $messages->delete($message);
 
-        unset($this->messages);
+        unset($this->timeline);
     }
 
     public function toggleSave(int $messageId): void
@@ -319,6 +345,110 @@ class Conversation extends Component
         unset($this->pinnedMessages);
     }
 
+    // ------------------------------------------------------------------ polls
+
+    public function onPollUpdated(): void
+    {
+        unset($this->timeline);
+    }
+
+    public function openPoll(): void
+    {
+        Gate::authorize('createIn', [Poll::class, $this->room]);
+
+        $this->reset('pollQuestion', 'pollOptions', 'pollClosesAt');
+        $this->resetValidation();
+        $this->pollOpen = true;
+    }
+
+    public function closePollComposer(): void
+    {
+        $this->reset('pollOpen', 'pollQuestion', 'pollOptions', 'pollClosesAt');
+        $this->resetValidation();
+    }
+
+    public function addPollOption(): void
+    {
+        if (count($this->pollOptions) < 10) {
+            $this->pollOptions[] = '';
+        }
+    }
+
+    public function removePollOption(int $index): void
+    {
+        // Two is the floor: a poll with one answer is not a question.
+        if (count($this->pollOptions) <= 2) {
+            return;
+        }
+
+        unset($this->pollOptions[$index]);
+        $this->pollOptions = array_values($this->pollOptions);
+    }
+
+    public function createPoll(PollService $polls): void
+    {
+        Gate::authorize('createIn', [Poll::class, $this->room]);
+
+        $this->validate([
+            'pollQuestion' => ['required', 'string', 'min:3', 'max:255'],
+            'pollOptions' => ['array', 'min:2', 'max:10'],
+            'pollOptions.*' => ['nullable', 'string', 'max:120'],
+            'pollClosesAt' => ['nullable', 'date', 'after:now'],
+        ], attributes: [
+            'pollQuestion' => 'question',
+            'pollClosesAt' => 'closing time',
+        ]);
+
+        // Blanks and duplicates are stripped by the service, so the count that
+        // matters is the one after normalisation, not the raw input length.
+        try {
+            $polls->create(
+                auth()->user(),
+                $this->room,
+                $this->pollQuestion,
+                $this->pollOptions,
+                $this->pollClosesAt !== '' ? \Carbon\CarbonImmutable::parse($this->pollClosesAt) : null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('pollOptions', $e->getMessage());
+
+            return;
+        }
+
+        $this->closePollComposer();
+        $this->afterSend();
+    }
+
+    public function vote(int $pollId, int $optionId, PollService $polls): void
+    {
+        $poll = Poll::findOrFail($pollId);
+
+        Gate::authorize('vote', $poll);
+
+        try {
+            // Clicking the option you already hold retracts it, so a voter can
+            // change their mind back to undecided without a second control.
+            $poll->chosenOptionIdFor(auth()->user()) === $optionId
+                ? $polls->retractVote($poll, auth()->user())
+                : $polls->vote($poll, auth()->user(), $optionId);
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('poll', $e->getMessage());
+        }
+
+        unset($this->timeline);
+    }
+
+    public function closePoll(int $pollId, PollService $polls): void
+    {
+        $poll = Poll::findOrFail($pollId);
+
+        Gate::authorize('close', $poll);
+
+        $polls->close($poll);
+
+        unset($this->timeline);
+    }
+
     public function toggleThread(int $messageId): void
     {
         if (isset($this->openThreads[$messageId])) {
@@ -344,7 +474,7 @@ class Conversation extends Component
     public function loadMore(): void
     {
         $this->limit += 40;
-        unset($this->messages);
+        unset($this->timeline);
     }
 
     public function leaveRoom(\App\Services\RoomProvisioner $rooms): void
@@ -365,7 +495,7 @@ class Conversation extends Component
 
     public function updatedSearch(): void
     {
-        unset($this->messages);
+        unset($this->timeline);
     }
 
     private function escapeLike(string $term): string

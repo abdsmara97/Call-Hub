@@ -50,7 +50,8 @@
                     </div>
                 </form>
             @else
-                @if (filled($message->body))
+                {{-- A poll's body is its question, which the card already shows. --}}
+                @if (filled($message->body) && ! $message->poll)
                     {{-- Plain text with line breaks. User content is never rendered as HTML. --}}
                     <div class="mt-0.5 whitespace-pre-wrap break-words text-base
                                 {{ $isEmergency ? 'font-medium text-content' : 'text-content' }}">{{ $message->body }}</div>
@@ -79,6 +80,10 @@
                             </li>
                         @endforeach
                     </ul>
+                @endif
+
+                @if ($message->poll)
+                    @include('livewire.hub.partials.poll-card', ['poll' => $message->poll])
                 @endif
             @endif
 

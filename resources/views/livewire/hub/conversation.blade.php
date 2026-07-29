@@ -90,7 +90,7 @@
          x-init="stick()"
          @scroll-to-latest.window="stick()">
 
-        @if ($this->messages->count() >= $limit)
+        @if ($this->timeline->count() >= $limit)
             <div class="p-3 text-center">
                 <button type="button" wire:click="loadMore" class="btn-secondary !py-1.5 !text-xs">
                     Load earlier messages
@@ -98,7 +98,7 @@
             </div>
         @endif
 
-        @forelse ($this->messages as $message)
+        @forelse ($this->timeline as $message)
             @include('livewire.hub.partials.message-row', [
                 'message' => $message,
                 'savedIds' => $this->savedMessageIds,
@@ -148,6 +148,77 @@
                 </div>
             @endif
 
+            {{-- Poll composer. Replaces nothing — it sits above the message box
+                 so a half-written message is never lost to opening it. --}}
+            @if ($pollOpen)
+                <div class="mb-2 rounded-md border border-line bg-surface-sunken p-3">
+                    <div class="flex items-center gap-2">
+                        <x-icon name="chart" class="h-4 w-4 text-content-subtle" />
+                        <h2 class="flex-1 text-sm font-semibold">Ask the room</h2>
+                        <button type="button" wire:click="closePollComposer"
+                                class="btn-ghost !px-1.5 !py-1" aria-label="Discard this poll">
+                            <x-icon name="x" class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <form wire:submit="createPoll" class="mt-2.5 space-y-2.5">
+                        <div>
+                            <label for="poll-question" class="sr-only">Poll question</label>
+                            <input id="poll-question" type="text" wire:model="pollQuestion"
+                                   placeholder="What should we decide?" class="field !py-1.5 text-sm">
+                            <x-input-error :messages="$errors->get('pollQuestion')" />
+                        </div>
+
+                        <ul class="space-y-1.5">
+                            @foreach ($pollOptions as $index => $option)
+                                <li class="flex items-center gap-1.5" wire:key="poll-option-{{ $index }}">
+                                    <label for="poll-option-{{ $index }}" class="sr-only">
+                                        Option {{ $index + 1 }}
+                                    </label>
+                                    <input id="poll-option-{{ $index }}" type="text"
+                                           wire:model="pollOptions.{{ $index }}"
+                                           placeholder="Option {{ $index + 1 }}"
+                                           class="field !py-1.5 text-sm">
+                                    @if (count($pollOptions) > 2)
+                                        <button type="button" wire:click="removePollOption({{ $index }})"
+                                                class="btn-ghost !px-1.5 !py-1"
+                                                aria-label="Remove option {{ $index + 1 }}">
+                                            <x-icon name="x" class="h-3.5 w-3.5" />
+                                        </button>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                        <x-input-error :messages="$errors->get('pollOptions')" />
+                        <x-input-error :messages="$errors->get('pollOptions.*')" />
+
+                        <div class="flex flex-wrap items-end gap-2">
+                            @if (count($pollOptions) < 10)
+                                <button type="button" wire:click="addPollOption"
+                                        class="btn-secondary !py-1.5 !text-xs">
+                                    <x-icon name="plus" class="h-3.5 w-3.5" />
+                                    Add option
+                                </button>
+                            @endif
+
+                            <div>
+                                <label for="poll-closes" class="block text-2xs text-content-muted">
+                                    Close automatically (optional)
+                                </label>
+                                <input id="poll-closes" type="datetime-local" wire:model="pollClosesAt"
+                                       class="field !w-auto !py-1.5 !text-xs">
+                            </div>
+
+                            <button type="submit" class="btn-primary ml-auto !py-1.5 !text-xs"
+                                    wire:loading.attr="disabled" wire:target="createPoll">
+                                Post poll
+                            </button>
+                        </div>
+                        <x-input-error :messages="$errors->get('pollClosesAt')" />
+                    </form>
+                </div>
+            @endif
+
             <form wire:submit="send" class="space-y-2">
                 <label for="composer" class="sr-only">Message {{ $room->displayNameFor($me) }}</label>
                 <textarea id="composer" wire:model="body" rows="2"
@@ -177,6 +248,13 @@
                             <input type="file" wire:model="uploads" multiple class="sr-only"
                                    accept="{{ collect(config('hub.attachments.allowed_mimes'))->map(fn ($e) => '.'.$e)->implode(',') }}">
                         </label>
+
+                        <button type="button" wire:click="openPoll"
+                                class="btn-ghost !px-2" title="Create a poll"
+                                aria-expanded="{{ $pollOpen ? 'true' : 'false' }}">
+                            <x-icon name="chart" class="h-4 w-4" />
+                            <span class="sr-only">Create a poll</span>
+                        </button>
                     @endunless
 
                     {{-- The emergency control is deliberately separate from Send. --}}
