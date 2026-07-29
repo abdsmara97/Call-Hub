@@ -5,7 +5,7 @@ namespace App\Events;
 use App\Models\Emergency;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
  * personal channel — the personal copy is what makes the alert reach someone
  * sitting in a different room, or with the tab in the background.
  */
-class EmergencySent implements ShouldBroadcast
+class EmergencySent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

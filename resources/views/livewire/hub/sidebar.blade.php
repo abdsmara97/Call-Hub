@@ -91,8 +91,14 @@
                             $count = $unread[$room->id] ?? 0;
                             $isActive = $activeRoomId === $room->id;
                             $other = $room->isDm() ? $room->otherMember($me) : null;
+                            $isBlinking = ($blinking[$room->id] ?? false) && ! $isActive;
                         @endphp
-                        <li>
+                        <li wire:key="room-row-{{ $room->id }}"
+                            class="overflow-hidden rounded-md {{ $isBlinking ? 'animate-room-blink' : '' }}"
+                            @if ($isBlinking)
+                                x-data
+                                x-on:animationend="$wire.stopBlinking({{ $room->id }})"
+                            @endif>
                             <a href="{{ route('rooms.show', $room) }}" wire:navigate
                                class="{{ $isActive ? 'nav-item-active' : 'nav-item' }} w-full"
                                @if ($isActive) aria-current="page" @endif>
@@ -111,9 +117,11 @@
                                 </span>
 
                                 @if ($count > 0)
-                                    <span class="badge-brand shrink-0 tabular-nums">
-                                        {{ $count > 99 ? '99+' : $count }}
-                                        <span class="sr-only">unread messages</span>
+                                    {{-- The number is the message, not the colour: it is
+                                         read out as "N unread messages" either way. --}}
+                                    <span class="badge-brand shrink-0 tabular-nums"
+                                          aria-label="{{ $count }} unread {{ Str::plural('message', $count) }}">
+                                        <span aria-hidden="true">{{ $count > 99 ? '99+' : $count }}</span>
                                     </span>
                                 @endif
                             </a>

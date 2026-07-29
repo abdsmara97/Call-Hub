@@ -145,11 +145,19 @@ export default {
                     from: { opacity: '0', transform: 'translateY(4px)' },
                     to: { opacity: '1', transform: 'translateY(0)' },
                 },
+                // A new message in a room you are not looking at. Deliberately
+                // finite: it draws the eye, then leaves the bold row and the
+                // count to carry the information.
+                'room-blink': {
+                    '0%, 100%': { backgroundColor: 'transparent' },
+                    '50%': { backgroundColor: 'rgb(var(--color-brand) / 0.22)' },
+                },
             },
 
             animation: {
                 'emergency-pulse': 'emergency-pulse 1.8s var(--ease-standard) infinite',
                 'fade-in-up': 'fade-in-up var(--duration-normal) var(--ease-out)',
+                'room-blink': 'room-blink 0.8s var(--ease-standard) 3',
             },
         },
     },

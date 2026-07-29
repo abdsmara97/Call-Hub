@@ -28,21 +28,81 @@ class Sidebar extends Component
 
     public string $newRoomType = 'public';
 
+    /**
+     * Rooms whose badge is currently blinking, as room id => true.
+     *
+     * @var array<int, bool>
+     */
+    public array $blinking = [];
+
     /** Refreshed whenever anything could change unread counts or the room list. */
     protected function getListeners(): array
     {
-        return [
+        $listeners = [
             'echo-private:App.Models.User.'.auth()->id().',.room.membership' => '$refresh',
             'echo-private:App.Models.User.'.auth()->id().',.emergency.sent' => '$refresh',
             'room-list-changed' => '$refresh',
             'messages-read' => '$refresh',
         ];
+
+        /*
+         * Subscribe to every room the user belongs to, not just the one that is
+         * open. Without this the badge for a room you are not looking at never
+         * moves until something else happens to re-render the sidebar — which
+         * is the whole case unread counts exist for.
+         */
+        foreach ($this->joinedRoomIds() as $roomId) {
+            $listeners["echo-private:room.{$roomId},.message.sent"] = 'onRoomMessage';
+        }
+
+        return $listeners;
+    }
+
+    /** @return array<int, int> */
+    private function joinedRoomIds(): array
+    {
+        return RoomMember::query()
+            ->where('user_id', auth()->id())
+            ->pluck('room_id')
+            ->all();
+    }
+
+    /**
+     * A message landed in one of the user's rooms.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function onRoomMessage(array $payload = []): void
+    {
+        $roomId = (int) ($payload['room_id'] ?? 0);
+
+        // Your own message is not news, and neither is one in the room you are
+        // already reading — that conversation marks itself read on arrival.
+        if (
+            $roomId
+            && $roomId !== $this->activeRoomId
+            && (int) ($payload['user_id'] ?? 0) !== auth()->id()
+        ) {
+            $this->blinking[$roomId] = true;
+        }
+    }
+
+    /** Alpine calls this when the blink animation has finished playing. */
+    public function stopBlinking(int $roomId): void
+    {
+        unset($this->blinking[$roomId]);
     }
 
     #[On('message-received')]
     public function refreshCounts(): void
     {
         // No-op body: the re-render itself recalculates the badges.
+    }
+
+    #[On('room-opened')]
+    public function clearBlinkForOpenedRoom(int $roomId): void
+    {
+        unset($this->blinking[$roomId]);
     }
 
     public function createRoom(RoomProvisioner $rooms): void
