@@ -118,7 +118,12 @@
 
     {{-- ---------------------------------------------------------- composer --}}
     @can('post', $room)
-        <div class="shrink-0 border-t border-line bg-surface p-4">
+        {{-- Typing lives on the presence channel as a client whisper, so a
+             keystroke never reaches the server. wire:ignore keeps Alpine's
+             subscription alive across Livewire re-renders. --}}
+        <div class="shrink-0 border-t border-line bg-surface p-4"
+             wire:ignore.self
+             x-data="typingIndicator({{ $room->id }}, @js(['id' => $me->id, 'name' => $me->name]))">
             @if ($replyTo)
                 <div class="mb-2 flex items-center gap-2 rounded-md bg-surface-sunken px-2.5 py-1.5 text-xs">
                     <x-icon name="reply" class="h-3.5 w-3.5 text-content-subtle" />
@@ -219,7 +224,13 @@
                 </div>
             @endif
 
-            <form wire:submit="send" class="space-y-2">
+            {{-- Announced politely: a colleague starting to type is not worth
+                 interrupting a screen-reader user mid-sentence for. --}}
+            <p x-show="label" x-cloak x-text="label"
+               class="mb-1 h-4 text-xs italic text-content-muted"
+               role="status" aria-live="polite"></p>
+
+            <form wire:submit="send" x-on:submit="stop()" class="space-y-2">
                 {{-- The '@' autocomplete wraps the textarea. Enter is shared:
                      while the list is open it picks a name, and only otherwise
                      does it send — guarding on state beats racing two handlers
@@ -228,13 +239,16 @@
                     <label for="composer" class="sr-only">Message {{ $room->displayNameFor($me) }}</label>
                     <textarea id="composer" wire:model="body" rows="2" x-ref="composer"
                               placeholder="{{ $emergencyArmed ? 'Describe the emergency…' : 'Write a message…' }}"
-                              x-on:input="scan()"
+                              {{-- scan() is the mention autocomplete on this
+                                   element; announce() resolves up to the typing
+                                   scope on the composer container. --}}
+                              x-on:input="scan(); announce()"
                               x-on:click="scan()"
                               x-on:keydown.arrow-down="open && (($event.preventDefault()), move(1))"
                               x-on:keydown.arrow-up="open && (($event.preventDefault()), move(-1))"
                               x-on:keydown.escape="open && (($event.stopPropagation()), close())"
                               x-on:keydown.tab="open && (($event.preventDefault()), choose())"
-                              @keydown.enter.exact="$event.preventDefault(); open ? choose() : $wire.send()"
+                              @keydown.enter.exact="$event.preventDefault(); open ? choose() : ($wire.send(), stop())"
                               x-bind:aria-expanded="open ? 'true' : 'false'"
                               aria-autocomplete="list"
                               class="field resize-y text-base

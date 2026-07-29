@@ -18,6 +18,10 @@ export default {
         './resources/views/**/*.blade.php',
         './app/Livewire/**/*.php',
         './app/View/**/*.php',
+        // Enums hand back class names — Availability::dotClass() is where the
+        // presence colours live. Without this the JIT never sees them and the
+        // status dot renders with no background at all.
+        './app/Enums/**/*.php',
     ],
 
     theme: {

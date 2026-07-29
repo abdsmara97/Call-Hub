@@ -1,5 +1,6 @@
 @php
     $me = auth()->user();
+    $room = $this->room;
     $isEmergency = $message->isEmergency();
     $isSaved = in_array($message->id, $savedIds ?? [], true);
 @endphp
@@ -134,6 +135,28 @@
                         </div>
                     @endcan
                 </div>
+            @endif
+
+            {{-- Read receipts, on your own messages only: "has anyone seen this"
+                 is a question you ask about what you sent, not what you read. --}}
+            @if ($message->user_id === $me->id && ! $message->trashed())
+                @php $seen = $this->seenBy($message->id, $message->user_id); @endphp
+
+                @if ($seen)
+                    <p class="mt-1 flex items-center gap-1 text-2xs text-content-subtle">
+                        <x-icon name="check-circle" class="h-3 w-3 shrink-0" />
+                        @if ($room->isDm())
+                            <span>Seen</span>
+                        @elseif (count($seen) === 1)
+                            <span>Seen by {{ $seen[0] }}</span>
+                        @else
+                            {{-- The names are in the title and read out in full for
+                                 screen readers; the count keeps the line short. --}}
+                            <span title="{{ implode(', ', $seen) }}">Seen by {{ count($seen) }}</span>
+                            <span class="sr-only">: {{ implode(', ', $seen) }}</span>
+                        @endif
+                    </p>
+                @endif
             @endif
 
             @if (($message->replies_count ?? 0) > 0)

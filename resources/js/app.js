@@ -2,6 +2,7 @@ import './bootstrap';
 
 import { registerEmojiPicker } from './emoji';
 import { registerMentionAutocomplete } from './mentions';
+import { registerTypingIndicator } from './typing';
 import { registerEmergencyAlerting } from './emergency';
 import {
     notificationPermission,
@@ -23,6 +24,7 @@ document.addEventListener('alpine:init', () => {
     registerMessageNotifications(window.Alpine);
     registerEmojiPicker(window.Alpine);
     registerMentionAutocomplete(window.Alpine);
+    registerTypingIndicator(window.Alpine);
 });
 
 // Notification clicks are handled by the service worker, which posts the target

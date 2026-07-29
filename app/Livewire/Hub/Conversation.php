@@ -168,6 +168,48 @@ class Conversation extends Component
     }
 
     /**
+     * Everyone who has read up to a given message, by name.
+     *
+     * Read state is a per-member cursor, not a row per message per person, so
+     * "has X seen this" is "is X's cursor at or past this id". The author is
+     * excluded — writing something does not count as having seen it.
+     *
+     * Pure array work over data the component already loaded: no query, even
+     * though this is called once per rendered row.
+     *
+     * @return list<string>
+     */
+    public function seenBy(int $messageId, int $authorId): array
+    {
+        $names = $this->memberNames;
+
+        $seen = [];
+
+        foreach ($this->readCursors as $userId => $cursor) {
+            if ($userId === $authorId || $cursor < $messageId) {
+                continue;
+            }
+
+            if (isset($names[$userId])) {
+                $seen[] = $names[$userId];
+            }
+        }
+
+        sort($seen);
+
+        return $seen;
+    }
+
+    /** @return array<int, string> user id => name */
+    #[Computed]
+    public function memberNames(): array
+    {
+        return $this->room->members
+            ->mapWithKeys(fn ($member) => [(int) $member->getKey() => (string) $member->name])
+            ->all();
+    }
+
+    /**
      * Who the composer will offer after an '@'.
      *
      * Exactly the room's membership, produced under the `view` gate that mount()
