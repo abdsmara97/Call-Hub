@@ -99,8 +99,8 @@ refresh and emergency overlays never appear.
 ### Seeded accounts
 
 `php artisan migrate --seed` builds 3 companies (Technologies, Logistics,
-Facilities), 8 administrations, and 32 accounts — one administrator, 30 staff,
-and one suspended account so the admin console has something to show.
+Facilities), 8 administrations, and 31 accounts — one administrator and 30
+staff, one of whom is suspended so the admin console has something to show.
 
 Sign in as the administrator with **`pm@oaktreetech.com` / `password`**. Every
 seeded account uses the same password.

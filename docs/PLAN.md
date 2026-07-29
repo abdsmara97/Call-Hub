@@ -1,6 +1,6 @@
 # Oak Tree Venture Hub — Build Plan (v1)
 
-Status: **approved and in build. M0–M4 complete; M5 is the remaining milestone.**
+Status: **complete. M0–M5 all delivered.**
 Plan drafted 2026-07-28. Status last updated 2026-07-29.
 
 All seven open decisions in §7 were taken as recommended, except the framework
@@ -186,14 +186,30 @@ Policies: `RoomPolicy` (view/join/post/moderate), `MessagePolicy` (update/delete
 | M2 — Messaging core | **Done** |
 | M3 — Emergency system | **Done** |
 | M4 — Add-ons | **Done** |
-| M5 — Hardening & deploy | **Not started** |
+| M5 — Hardening & deploy | **Done** |
 
-Carried into M5: no Dusk suite yet (the emergency paths are covered by feature
-tests, not browser tests), no Supervisor/nginx/Reverb deployment configs, and
-the README is still the stock Laravel one. Horizon and Dusk are installed but
-unconfigured. Pint's vendored phar is corrupt on this machine — it carries a
-baked-in path from an unrelated project — so style is unenforced until that is
-reinstalled.
+Test suite: 122 Pest tests passing, plus a Dusk suite for the emergency paths.
+
+Three bugs the M5 pass found, all of which would have shipped:
+
+1. **No `notifications` table migration.** Both emergency notifications send on
+   the `database` channel, so delivering any emergency threw at runtime. No
+   existing test raised an emergency end to end, so nothing caught it.
+2. **Horizon watched only the `default` queue**, while every emergency job runs
+   on `emergency` — the alert fan-out and escalation chase would have sat
+   unprocessed in production.
+3. **`Conversation::messages()` collided with Livewire's validation-message
+   hook**, so every validation failure in the composer threw a TypeError
+   instead of showing the error.
+
+Still open, and deliberately not papered over:
+
+- Pint's vendored phar is corrupt in this checkout (it carries a baked-in path
+  from an unrelated project), so style is unenforced until it is reinstalled.
+- The Dusk suite has not been executed end to end here: ChromeDriver could not
+  be downloaded in the build environment. The tests are written against the
+  real selectors and routes, but the first run is unproven.
+- No CI pipeline.
 
 **M0 — Foundation.** Laravel 13 scaffold, Breeze (Livewire stack), Tailwind + Vite, design-token CSS variables, light/dark theming, app shell layout, Pest wired, seed skeleton, README started. *Done = app boots with a styled, token-driven login page in both themes.*
 
