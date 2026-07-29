@@ -1,7 +1,10 @@
-# Oak Tree Venture Hub — Build Plan (v1, pending approval)
+# Oak Tree Venture Hub — Build Plan (v1)
 
-Status: **draft — awaiting PM approval before any code is written.**
-Date: 2026-07-28
+Status: **approved and in build. M0–M4 complete; M5 is the remaining milestone.**
+Plan drafted 2026-07-28. Status last updated 2026-07-29.
+
+All seven open decisions in §7 were taken as recommended, except the framework
+version: the build is on **Laravel 12 / PHP 8.2**, not Laravel 13.
 
 ---
 
@@ -175,6 +178,22 @@ Policies: `RoomPolicy` (view/join/post/moderate), `MessagePolicy` (update/delete
 ---
 
 ## 5. Milestones
+
+| Milestone | Status |
+|---|---|
+| M0 — Foundation | **Done** |
+| M1 — Auth & admin | **Done** |
+| M2 — Messaging core | **Done** |
+| M3 — Emergency system | **Done** |
+| M4 — Add-ons | **Done** |
+| M5 — Hardening & deploy | **Not started** |
+
+Carried into M5: no Dusk suite yet (the emergency paths are covered by feature
+tests, not browser tests), no Supervisor/nginx/Reverb deployment configs, and
+the README is still the stock Laravel one. Horizon and Dusk are installed but
+unconfigured. Pint's vendored phar is corrupt on this machine — it carries a
+baked-in path from an unrelated project — so style is unenforced until that is
+reinstalled.
 
 **M0 — Foundation.** Laravel 13 scaffold, Breeze (Livewire stack), Tailwind + Vite, design-token CSS variables, light/dark theming, app shell layout, Pest wired, seed skeleton, README started. *Done = app boots with a styled, token-driven login page in both themes.*
 
