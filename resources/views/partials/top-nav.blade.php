@@ -5,15 +5,21 @@
 
 <header class="z-sticky shrink-0 border-b border-line bg-surface">
     <div class="flex h-14 items-center gap-3 px-3 sm:px-4">
-        {{-- Wordmark. The acorn glyph doubles as the app's favicon-scale identity. --}}
-        <a href="{{ route('hub') }}" class="flex items-center gap-2 rounded-sm px-1 py-1">
-            <span class="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-brand-on">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2c3.6 0 6.5 2.4 6.5 5.4 0 .6-.5 1.1-1.1 1.1H6.6c-.6 0-1.1-.5-1.1-1.1C5.5 4.4 8.4 2 12 2Z"/>
-                    <path d="M6.8 10h10.4c.5 0 .8.4.8.9 0 4.3-2.7 8-6 11.1-3.3-3.1-6-6.8-6-11.1 0-.5.3-.9.8-.9Z" opacity=".75"/>
-                </svg>
-            </span>
-            <span class="hidden text-sm font-semibold tracking-tight sm:block">Oak Tree Hub</span>
+        {{--
+            The Oak Tree Ventures wordmark. It carries the company name itself, so
+            there is no text beside it — the link's accessible name comes from
+            aria-label instead, which also keeps it stable at every breakpoint.
+
+            The asset has a white background (it is a JPEG, so no alpha), hence
+            the white chip: invisible against the light surface, and a deliberate
+            badge rather than a stray white rectangle in dark mode.
+        --}}
+        <a href="{{ route('hub') }}"
+           class="flex shrink-0 items-center rounded-sm px-1 py-1"
+           aria-label="Oak Tree Venture Hub — go to messages">
+            <img src="{{ asset('images/logo.png') }}" alt=""
+                 width="187" height="53"
+                 class="h-8 w-auto rounded bg-white p-0.5">
         </a>
 
         @auth

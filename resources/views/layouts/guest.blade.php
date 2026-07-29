@@ -21,14 +21,11 @@
 </head>
 <body class="h-full bg-canvas text-content">
     <div class="flex min-h-full flex-col items-center justify-center px-4 py-10">
-        <div class="mb-6 flex items-center gap-3">
-            <span class="flex h-11 w-11 items-center justify-center rounded-lg bg-brand text-brand-on">
-                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2c3.6 0 6.5 2.4 6.5 5.4 0 .6-.5 1.1-1.1 1.1H6.6c-.6 0-1.1-.5-1.1-1.1C5.5 4.4 8.4 2 12 2Z"/>
-                    <path d="M6.8 10h10.4c.5 0 .8.4.8.9 0 4.3-2.7 8-6 11.1-3.3-3.1-6-6.8-6-11.1 0-.5.3-.9.8-.9Z" opacity=".75"/>
-                </svg>
-            </span>
-            <div>
+        <div class="mb-6 flex flex-col items-center gap-3">
+            <img src="{{ asset('images/logo.png') }}" alt=""
+                 width="187" height="53"
+                 class="h-12 w-auto rounded-lg bg-white p-1.5">
+            <div class="text-center">
                 <h1 class="text-lg font-semibold tracking-tight">Oak Tree Venture Hub</h1>
                 <p class="text-xs text-content-muted">Internal communications</p>
             </div>
