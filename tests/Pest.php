@@ -1,7 +1,18 @@
 <?php
 
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\DuskTestCase;
 use Tests\TestCase;
+
+/*
+ * Browser tests drive a real server against a real database, so they migrate
+ * rather than wrap in a transaction — the HTTP request runs in a separate
+ * process and would never see an uncommitted one.
+ */
+pest()->extend(DuskTestCase::class)
+    ->use(DatabaseMigrations::class)
+    ->in('Browser');
 
 /*
 |--------------------------------------------------------------------------

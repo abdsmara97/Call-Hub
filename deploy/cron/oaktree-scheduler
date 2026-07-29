@@ -1,0 +1,12 @@
+# Laravel's scheduler. Install with:
+#   sudo cp deploy/cron/oaktree-scheduler /etc/cron.d/oaktree-scheduler
+#   sudo chmod 644 /etc/cron.d/oaktree-scheduler
+#
+# This one line drives everything in routes/console.php, including the
+# per-minute emergency:sweep that backstops the escalation jobs. Without it an
+# escalation lost to a worker restart is never retried — so monitor it.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+* * * * * www-data cd /var/www/oaktree-hub && php artisan schedule:run >> /var/log/oaktree/scheduler.log 2>&1
