@@ -67,15 +67,85 @@ class EmployeeImport implements ToCollection, WithChunkReading, WithHeadingRow
         return max(1, $this->chunkSize);
     }
 
-    /** A ready-to-paste example of the file this importer expects. */
-    public static function sampleCsv(): string
+    /**
+     * A ready-to-fill template for this importer.
+     *
+     * The company and administration columns are filled from the organisation
+     * that actually exists, because the importer matches those names and
+     * rejects anything it does not recognise. A template carrying invented
+     * departments would fail on every single row.
+     *
+     * @param  bool  $withExamples  false gives the header plus blank rows only.
+     */
+    public static function sampleCsv(bool $withExamples = true): string
     {
-        return implode("\n", [
-            implode(',', self::HEADERS),
-            'Amina Farouk,amina.farouk@example.com,+20 100 555 0101,Oak Tree Ventures,Finance,Financial Analyst,employee',
-            'Youssef Nabil,youssef.nabil@example.com,+20 100 555 0102,Oak Tree Ventures,Operations,Site Supervisor,',
-            'Dina Hassan,dina.hassan@example.com,,Oak Tree Ventures,People,HR Manager,admin',
-        ])."\n";
+        $lines = [implode(',', self::HEADERS)];
+
+        if (! $withExamples) {
+            return implode("\n", $lines)."\n";
+        }
+
+        $people = [
+            ['Amina Farouk', 'amina.farouk@example.com', '+20 100 555 0101', 'Financial Analyst', 'employee'],
+            ['Youssef Nabil', 'youssef.nabil@example.com', '+20 100 555 0102', 'Site Supervisor', ''],
+            ['Dina Hassan', 'dina.hassan@example.com', '', 'HR Manager', 'admin'],
+        ];
+
+        $pairs = self::examplePairs();
+
+        foreach ($people as $index => [$name, $email, $phone, $jobTitle, $role]) {
+            // Fewer real departments than example people is fine — wrap around.
+            [$company, $administration] = $pairs[$index % count($pairs)];
+
+            $lines[] = implode(',', [
+                self::csvField($name),
+                self::csvField($email),
+                self::csvField($phone),
+                self::csvField($company),
+                self::csvField($administration),
+                self::csvField($jobTitle),
+                self::csvField($role),
+            ]);
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /**
+     * Real company/administration pairs, spread across different companies so
+     * the template shows that both columns matter.
+     *
+     * @return list<array{string, string}>
+     */
+    private static function examplePairs(): array
+    {
+        $pairs = Administration::query()
+            ->with('company')
+            ->get()
+            ->filter(fn (Administration $a) => $a->company !== null)
+            ->groupBy('company_id')
+            // One per company first, so the examples are not all the same firm.
+            ->map(fn ($group) => $group->sortBy('name')->first())
+            ->map(fn (Administration $a) => [$a->company->name, $a->name])
+            ->values()
+            ->all();
+
+        if ($pairs === []) {
+            // Nothing set up yet — placeholders, clearly marked as such.
+            return [['Your Company', 'Your Administration']];
+        }
+
+        return $pairs;
+    }
+
+    /** Quotes only when a field would otherwise break the row. */
+    private static function csvField(string $value): string
+    {
+        if (preg_match('/[",\r\n]/', $value) !== 1) {
+            return $value;
+        }
+
+        return '"'.str_replace('"', '""', $value).'"';
     }
 
     // ------------------------------------------------------------------ rows

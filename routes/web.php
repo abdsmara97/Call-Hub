@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\EmergencyLogExportController;
+use App\Http\Controllers\EmployeeImportTemplateController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\StartDirectMessageController;
 use App\Livewire\Admin\EmergencyBroadcast;
@@ -44,6 +45,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('users', UserManager::class)->name('users');
         Route::get('users/import', UserImport::class)->name('import');
+        Route::get('users/import/template', EmployeeImportTemplateController::class)
+            ->name('import.template');
         Route::get('broadcast', EmergencyBroadcast::class)->name('broadcast');
         Route::get('emergency-log', EmergencyLog::class)->name('emergency-log');
         Route::get('emergency-log/export', EmergencyLogExportController::class)->name('emergency-log.export');

@@ -29,6 +29,29 @@
                     up to 2&nbsp;MB and {{ number_format($maxRows) }} rows.
                 </p>
 
+                {{-- Start from the template rather than guessing the columns. It
+                     is generated on download, so the company and administration
+                     names in it are always ones this hub will accept. --}}
+                <div class="mt-3 rounded-lg border border-brand-border bg-brand-tint p-3">
+                    <p class="text-xs font-semibold text-brand-text">New to this? Start with the template.</p>
+                    <p class="mt-0.5 text-xs text-content-muted">
+                        It has the correct header row and three filled-in example people using your real
+                        departments. Delete the examples, add your staff, upload.
+                    </p>
+
+                    <div class="mt-2.5 flex flex-wrap gap-2">
+                        <a href="{{ route('admin.import.template') }}" class="btn-primary !py-1.5 !text-xs">
+                            <x-icon name="download" class="h-4 w-4" />
+                            Download template
+                        </a>
+                        <a href="{{ route('admin.import.template', ['blank' => 1]) }}"
+                           class="btn-secondary !py-1.5 !text-xs">
+                            <x-icon name="download" class="h-4 w-4" />
+                            Headers only
+                        </a>
+                    </div>
+                </div>
+
                 <form wire:submit="import" class="mt-4 space-y-4">
                     <div>
                         <x-input-label for="import-file" value="Employee file" />
@@ -91,6 +114,36 @@
 
                 <h3 class="mt-4 text-xs font-semibold uppercase tracking-wide text-content-muted">Sample</h3>
                 <pre class="mt-1 overflow-x-auto rounded-md border border-line bg-surface-sunken p-3 font-mono text-2xs text-content"><code>{{ $sample }}</code></pre>
+
+                {{-- Spelled out because the importer matches these by name and
+                     rejects anything else. Guessing a department is the single
+                     most common reason a row is skipped. --}}
+                <h3 class="mt-4 text-xs font-semibold uppercase tracking-wide text-content-muted">
+                    Names you can use
+                </h3>
+
+                @if ($organisation->isEmpty())
+                    <p class="mt-1 text-xs text-content-muted">
+                        No companies exist yet, so no import can succeed. Create a company and its
+                        administrations first.
+                    </p>
+                @else
+                    <dl class="mt-1 space-y-1.5">
+                        @foreach ($organisation as $companyName => $administrationNames)
+                            <div class="rounded-md border border-line bg-surface-sunken px-2.5 py-1.5">
+                                <dt class="font-mono text-2xs font-semibold text-content">{{ $companyName }}</dt>
+                                <dd class="mt-1 flex flex-wrap gap-1">
+                                    @foreach ($administrationNames as $administrationName)
+                                        <span class="badge-neutral font-mono">{{ $administrationName }}</span>
+                                    @endforeach
+                                </dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                    <p class="mt-1.5 text-2xs text-content-subtle">
+                        Case does not matter. An administration must belong to the company on the same row.
+                    </p>
+                @endif
             </div>
         </div>
 

@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Imports\EmployeeImport;
 use App\Jobs\ProcessEmployeeImport;
+use App\Models\Company;
 use App\Models\User;
 use App\Support\ImportReport;
 use Illuminate\Support\Facades\Auth;
@@ -75,6 +76,23 @@ class UserImport extends Component
         $this->statusMessage = 'The file was accepted and is being processed. Results will appear here automatically.';
     }
 
+    /**
+     * The exact company and administration names a row may use, since the
+     * importer matches them by name and rejects anything else.
+     *
+     * @return \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, string>>
+     */
+    private function organisation(): \Illuminate\Support\Collection
+    {
+        return Company::query()
+            ->with(['administrations' => fn ($q) => $q->orderBy('name')])
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Company $company) => [
+                $company->name => $company->administrations->pluck('name'),
+            ]);
+    }
+
     public function clearReport(): void
     {
         $this->authorize('import', User::class);
@@ -95,6 +113,7 @@ class UserImport extends Component
             'running' => (bool) Cache::get(ImportReport::runningKey($actorId), false),
             'headers' => EmployeeImport::HEADERS,
             'sample' => EmployeeImport::sampleCsv(),
+            'organisation' => $this->organisation(),
             'maxRows' => (int) config('hub.import.max_rows', 2000),
         ]);
     }
