@@ -340,9 +340,9 @@
             <section class="panel p-4 lg:col-span-3" aria-labelledby="push-heading">
                 <h2 id="push-heading" class="text-lg font-semibold tracking-tight">Browser notifications</h2>
                 <p class="mt-1 text-sm text-content-muted">
-                    Emergency messages are delivered by browser push and are announced with a sound,
-                    so they reach you even when this tab is in the background or closed. Allowing
-                    notifications is what makes that possible on this device.
+                    Allowing notifications lets the Hub raise a pop-up on this device. Emergency
+                    messages also use it, and are announced with a sound. You only need to allow it
+                    once per browser.
                 </p>
 
                 {{--
@@ -399,11 +399,41 @@
                               px-3 py-2 text-sm text-emergency-text">
                         <x-icon name="alert" class="mt-0.5 h-4 w-4 shrink-0" />
                         <span>
-                            Notifications are blocked for this site, so emergency alerts cannot pop up
-                            here. Re-allow them from the padlock or site-settings icon in your browser's
-                            address bar, then reload this page.
+                            Notifications are blocked for this site, so nothing can pop up here. This
+                            page cannot ask again — re-allow them from the padlock or site-settings
+                            icon in your browser's address bar, then reload.
                         </span>
                     </p>
+                </div>
+
+                {{-- The server-side half: whether we send anything at all. Separate
+                     from the browser permission above, which only says whether the
+                     device is willing to display it. --}}
+                <div class="mt-4 border-t border-line pt-4">
+                    <label for="notify-on-message" class="flex cursor-pointer items-start gap-3">
+                        <input id="notify-on-message" type="checkbox"
+                               wire:model.live="notify_on_message"
+                               class="mt-0.5 rounded border-line-strong text-brand focus:ring-brand/40">
+                        <span class="min-w-0">
+                            <span class="block text-sm font-medium text-content">
+                                Notify me about new messages
+                            </span>
+                            <span class="block text-xs text-content-muted">
+                                Pops up when someone messages you and this tab is in the background.
+                                Nothing pops up while you are looking at the Hub — the conversation
+                                list already flashes. Quiet hours below silence these; emergencies
+                                ignore quiet hours by design.
+                            </span>
+                        </span>
+                    </label>
+
+                    @if ($notificationStatus)
+                        <p role="status" aria-live="polite"
+                           class="mt-2 flex items-center gap-1.5 text-xs text-brand-text">
+                            <x-icon name="check-circle" class="h-3.5 w-3.5" />
+                            {{ $notificationStatus }}
+                        </p>
+                    @endif
                 </div>
             </section>
 

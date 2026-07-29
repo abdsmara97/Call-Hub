@@ -39,6 +39,11 @@ class ProfileSettings extends Component
 
     public string $contactStatus = '';
 
+    // ------------------------------------------------------- notifications
+    public bool $notify_on_message = true;
+
+    public string $notificationStatus = '';
+
     // ----------------------------------------------------------- password
     public string $current_password = '';
 
@@ -64,6 +69,20 @@ class ProfileSettings extends Component
         $this->phone = $user->phone;
         $this->status_message = $user->status_message;
         $this->availability = ($user->availability ?? Availability::Available)->value;
+        $this->notify_on_message = (bool) $user->notify_on_message;
+    }
+
+    /**
+     * A single switch saves itself — making someone hunt for a Save button after
+     * flicking one toggle is how preferences end up not stuck.
+     */
+    public function updatedNotifyOnMessage(bool $value): void
+    {
+        $this->user()->forceFill(['notify_on_message' => $value])->save();
+
+        $this->notificationStatus = $value
+            ? 'You will be notified about new messages.'
+            : 'Message notifications are off. Emergencies will still reach you.';
     }
 
     private function user(): User

@@ -46,10 +46,18 @@
     --}}
     @auth
         @livewire('hub.emergency-alerts')
+        @livewire('hub.message-notifier')
     @endauth
 
     {{-- Screen readers get every emergency announced here. --}}
     <div id="a11y-announcer" class="sr-only-live" role="status" aria-live="assertive" aria-atomic="true"></div>
+
+    {{--
+        Ordinary messages announce here instead. Deliberately a separate,
+        polite region: routing routine chat through the assertive one above
+        would interrupt a screen-reader user mid-sentence for every message.
+    --}}
+    <div id="a11y-announcer-polite" class="sr-only-live" role="status" aria-live="polite" aria-atomic="true"></div>
 
     @livewireScripts
 </body>

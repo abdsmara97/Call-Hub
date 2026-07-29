@@ -36,6 +36,7 @@ class UserFactory extends Factory
             'job_title' => fake()->jobTitle(),
             'status' => UserStatus::Active->value,
             'availability' => Availability::Available->value,
+            'notify_on_message' => true,
             'must_change_password' => false,
         ];
     }

@@ -1,13 +1,24 @@
 import './bootstrap';
 
 import { registerEmergencyAlerting } from './emergency';
+import {
+    notificationPermission,
+    registerMessageNotifications,
+    requestNotificationPermission,
+} from './notifications';
 import { enablePush, pushPermission } from './push';
 
-// Exposed for the profile screen's "enable notifications" button.
-window.OakTreeHub = { enablePush, pushPermission };
+// Exposed for the profile screen's notification buttons.
+window.OakTreeHub = {
+    enablePush,
+    pushPermission,
+    requestNotificationPermission,
+    notificationPermission,
+};
 
 document.addEventListener('alpine:init', () => {
     registerEmergencyAlerting(window.Alpine);
+    registerMessageNotifications(window.Alpine);
 });
 
 // Notification clicks are handled by the service worker, which posts the target

@@ -34,6 +34,7 @@ class User extends Authenticatable
         'avatar_path',
         'status_message',
         'availability',
+        'notify_on_message',
         'last_seen_at',
     ];
 
@@ -49,6 +50,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'notify_on_message' => 'boolean',
             'status' => UserStatus::class,
             'availability' => Availability::class,
         ];
@@ -160,30 +162,41 @@ class User extends Authenticatable
 
     /**
      * Do Not Disturb suppresses ordinary notifications only. Emergency delivery
-     * deliberately ignores this — see EmergencyNotifier.
+     * deliberately ignores this — see App\Jobs\DispatchEmergencyNotifications.
+     *
+     * An overnight window belongs to the day it *starts* on, so 02:00 on Sunday
+     * is covered by the Saturday 22:00 → 06:00 row, not by a Sunday row. Missing
+     * that is how a quiet period leaks notifications through its second half.
      */
     public function isWithinDndWindow(?\DateTimeInterface $at = null): bool
     {
         $at = $at ? \Carbon\CarbonImmutable::instance(\Carbon\Carbon::instance($at)) : now()->toImmutable();
+
         $time = $at->format('H:i:s');
+        $today = (int) $at->format('w');
+        $yesterday = ($today + 6) % 7;
 
         return $this->dndWindows()
-            ->where('day_of_week', (int) $at->format('w'))
-            ->where(function ($query) use ($time) {
+            ->where(function ($query) use ($time, $today, $yesterday) {
                 $query
-                    // Same-day window, e.g. 09:00 → 17:00.
-                    ->where(function ($q) use ($time) {
-                        $q->whereColumn('starts_at', '<=', 'ends_at')
+                    // Same-day window today, e.g. 09:00 → 17:00.
+                    ->orWhere(function ($q) use ($time, $today) {
+                        $q->where('day_of_week', $today)
+                            ->whereColumn('starts_at', '<=', 'ends_at')
                             ->where('starts_at', '<=', $time)
                             ->where('ends_at', '>=', $time);
                     })
-                    // Overnight window, e.g. 22:00 → 06:00.
-                    ->orWhere(function ($q) use ($time) {
-                        $q->whereColumn('starts_at', '>', 'ends_at')
-                            ->where(function ($inner) use ($time) {
-                                $inner->where('starts_at', '<=', $time)
-                                    ->orWhere('ends_at', '>=', $time);
-                            });
+                    // Overnight window that started today and runs past midnight.
+                    ->orWhere(function ($q) use ($time, $today) {
+                        $q->where('day_of_week', $today)
+                            ->whereColumn('starts_at', '>', 'ends_at')
+                            ->where('starts_at', '<=', $time);
+                    })
+                    // Overnight window that started yesterday and has not ended.
+                    ->orWhere(function ($q) use ($time, $yesterday) {
+                        $q->where('day_of_week', $yesterday)
+                            ->whereColumn('starts_at', '>', 'ends_at')
+                            ->where('ends_at', '>=', $time);
                     });
             })
             ->exists();
