@@ -72,6 +72,43 @@ class Message extends Model
         return $this->hasOne(Poll::class);
     }
 
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class);
+    }
+
+    /**
+     * Reactions grouped for display: one entry per emoji, in the order each was
+     * first used, with who reacted and whether the viewer is among them.
+     *
+     * Reads the loaded relation when the caller eager-loaded it, so rendering a
+     * page of messages does not cost a query per row.
+     *
+     * @return list<array{emoji: string, count: int, mine: bool, who: string}>
+     */
+    public function reactionSummary(User $viewer): array
+    {
+        $reactions = $this->relationLoaded('reactions')
+            ? $this->reactions
+            : $this->reactions()->with('user')->get();
+
+        return $reactions
+            ->sortBy('id')
+            ->groupBy('emoji')
+            ->map(fn ($group, $emoji) => [
+                'emoji' => (string) $emoji,
+                'count' => $group->count(),
+                'mine' => $group->contains('user_id', $viewer->getKey()),
+                'who' => $group
+                    ->map(fn (MessageReaction $r) => $r->user_id === $viewer->getKey()
+                        ? 'You'
+                        : ($r->user?->name ?? 'Someone'))
+                    ->join(', ', ' and '),
+            ])
+            ->values()
+            ->all();
+    }
+
     // ----------------------------------------------------------------- scopes
 
     public function scopeRoots(Builder $query): Builder

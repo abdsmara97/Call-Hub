@@ -249,6 +249,22 @@
                                    accept="{{ collect(config('hub.attachments.allowed_mimes'))->map(fn ($e) => '.'.$e)->implode(',') }}">
                         </label>
 
+                        {{-- Emoji. Inserts at the caret, so it works mid-sentence. --}}
+                        <div class="relative" wire:ignore
+                             x-data="emojiPicker((emoji) => {
+                                 const box = document.getElementById('composer');
+                                 $insertEmoji(box, emoji);
+                             })">
+                            <button type="button" x-on:click="toggle()"
+                                    class="btn-ghost !px-2" title="Insert an emoji"
+                                    x-bind:aria-expanded="open ? 'true' : 'false'">
+                                <x-icon name="face-smile" class="h-4 w-4" />
+                                <span class="sr-only">Insert an emoji</span>
+                            </button>
+
+                            @include('livewire.hub.partials.emoji-panel', ['panelId' => 'composer'])
+                        </div>
+
                         <button type="button" wire:click="openPoll"
                                 class="btn-ghost !px-2" title="Create a poll"
                                 aria-expanded="{{ $pollOpen ? 'true' : 'false' }}">

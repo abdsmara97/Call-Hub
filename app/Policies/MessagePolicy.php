@@ -45,4 +45,14 @@ class MessagePolicy
     {
         return $this->view($user, $message);
     }
+
+    /**
+     * Reacting needs membership, not just read access — someone browsing a
+     * public room they have not joined can see the tally but not move it. Same
+     * rule as posting and as voting in a poll.
+     */
+    public function react(User $user, Message $message): bool
+    {
+        return $message->deleted_at === null && $user->belongsToRoom($message->room);
+    }
 }

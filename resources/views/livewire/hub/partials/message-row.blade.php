@@ -87,6 +87,56 @@
                 @endif
             @endif
 
+            {{-- Reactions. The chip carries the count as text, so it never
+                 depends on being able to tell the emoji apart at 14px. --}}
+            @php $reactions = $message->reactionSummary($me); @endphp
+
+            @if ($reactions || $me->can('react', $message))
+                <div class="mt-1.5 flex flex-wrap items-center gap-1">
+                    @foreach ($reactions as $reaction)
+                        <button type="button"
+                                @can('react', $message)
+                                    wire:click="react({{ $message->id }}, '{{ $reaction['emoji'] }}')"
+                                @else
+                                    disabled
+                                @endcan
+                                class="flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs
+                                       transition-colors duration-fast
+                                       {{ $reaction['mine']
+                                            ? 'border-brand bg-brand-tint font-medium text-brand-text'
+                                            : 'border-line bg-surface-sunken text-content-muted hover:bg-surface-hover' }}"
+                                aria-pressed="{{ $reaction['mine'] ? 'true' : 'false' }}"
+                                title="{{ $reaction['who'] }} reacted with {{ $reaction['emoji'] }}">
+                            <span aria-hidden="true">{{ $reaction['emoji'] }}</span>
+                            <span class="tabular-nums">{{ $reaction['count'] }}</span>
+                            <span class="sr-only">
+                                {{ $reaction['who'] }} reacted with {{ $reaction['emoji'] }}.
+                                {{ $reaction['mine'] ? 'Select to remove yours.' : 'Select to add yours.' }}
+                            </span>
+                        </button>
+                    @endforeach
+
+                    @can('react', $message)
+                        <div class="relative" wire:ignore
+                             x-data="emojiPicker((emoji) => $wire.react({{ $message->id }}, emoji))">
+                            <button type="button" x-on:click="toggle()"
+                                    class="flex items-center rounded-full border border-dashed border-line
+                                           px-1.5 py-0.5 text-content-subtle hover:bg-surface-hover
+                                           {{ $reactions ? '' : 'opacity-0 group-hover:opacity-100 focus:opacity-100' }}"
+                                    x-bind:aria-expanded="open ? 'true' : 'false'">
+                                <x-icon name="face-smile" class="h-3.5 w-3.5" />
+                                <span class="sr-only">Add a reaction</span>
+                            </button>
+
+                            @include('livewire.hub.partials.emoji-panel', [
+                                'panelId' => 'msg-'.$message->id,
+                                'drop' => 'down',
+                            ])
+                        </div>
+                    @endcan
+                </div>
+            @endif
+
             @if (($message->replies_count ?? 0) > 0)
                 <button type="button" wire:click="toggleThread({{ $message->id }})"
                         class="mt-1.5 inline-flex items-center gap-1 rounded-sm text-xs font-medium text-brand-text hover:underline"

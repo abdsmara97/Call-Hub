@@ -1,5 +1,6 @@
 import './bootstrap';
 
+import { registerEmojiPicker } from './emoji';
 import { registerEmergencyAlerting } from './emergency';
 import {
     notificationPermission,
@@ -19,6 +20,7 @@ window.OakTreeHub = {
 document.addEventListener('alpine:init', () => {
     registerEmergencyAlerting(window.Alpine);
     registerMessageNotifications(window.Alpine);
+    registerEmojiPicker(window.Alpine);
 });
 
 // Notification clicks are handled by the service worker, which posts the target

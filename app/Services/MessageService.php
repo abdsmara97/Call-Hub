@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Events\MessageDeleted;
+use App\Events\MessageReacted;
 use App\Events\MessageSent;
 use App\Events\MessageUpdated;
 use App\Events\ReadCursorUpdated;
 use App\Models\Attachment;
 use App\Models\Emergency;
 use App\Models\Message;
+use App\Models\MessageReaction;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Models\User;
@@ -91,6 +93,118 @@ class MessageService
         $message->delete();
 
         broadcast(new MessageDeleted($id, $roomId))->toOthers();
+    }
+
+    /**
+     * Adds the reaction, or removes it if the person already reacted with that
+     * emoji. Returns true when the reaction now stands.
+     */
+    public function toggleReaction(Message $message, User $user, string $emoji): bool
+    {
+        $emoji = $this->normaliseEmoji($emoji);
+
+        $existing = MessageReaction::query()
+            ->where('message_id', $message->getKey())
+            ->where('user_id', $user->getKey())
+            ->where('emoji', $emoji)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $added = false;
+        } else {
+            MessageReaction::create([
+                'message_id' => $message->getKey(),
+                'user_id' => $user->getKey(),
+                'emoji' => $emoji,
+            ]);
+            $added = true;
+        }
+
+        broadcast(new MessageReacted($message->getKey(), $message->room_id))->toOthers();
+
+        return $added;
+    }
+
+    /**
+     * Reactions are pictographs, not free text.
+     *
+     * Validated by what the string *is* rather than what it is not: every
+     * codepoint must be either a pictograph or one of the modifiers that dress
+     * one (variation selector, zero-width joiner, skin tone, keycap), and at
+     * least one must be a pictograph in its own right.
+     *
+     * An exclusion list was the first attempt and it let `<script>` through —
+     * angle brackets are symbols, not punctuation. Blade would have escaped it,
+     * but storing it at all is wrong.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function normaliseEmoji(string $emoji): string
+    {
+        $emoji = trim($emoji);
+
+        if ($emoji === '') {
+            throw new \InvalidArgumentException('Pick an emoji to react with.');
+        }
+
+        // A ZWJ family sequence is legitimately several codepoints; well beyond
+        // that is somebody probing.
+        if (mb_strlen($emoji) > 8) {
+            throw new \InvalidArgumentException('That is not a usable reaction.');
+        }
+
+        $codepoints = array_map(
+            fn (string $c) => mb_ord($c, 'UTF-8'),
+            preg_split('//u', $emoji, -1, PREG_SPLIT_NO_EMPTY) ?: [],
+        );
+
+        $hasPictograph = false;
+
+        foreach ($codepoints as $cp) {
+            if ($cp === false) {
+                throw new \InvalidArgumentException('That is not a usable reaction.');
+            }
+
+            if ($this->isPictograph($cp)) {
+                $hasPictograph = true;
+
+                continue;
+            }
+
+            if (! $this->isEmojiModifier($cp)) {
+                throw new \InvalidArgumentException('Reactions have to be an emoji.');
+            }
+        }
+
+        if (! $hasPictograph) {
+            throw new \InvalidArgumentException('Reactions have to be an emoji.');
+        }
+
+        return $emoji;
+    }
+
+    /** The blocks emoji actually live in. */
+    private function isPictograph(int $cp): bool
+    {
+        return ($cp >= 0x1F000 && $cp <= 0x1FAFF)   // pictographs, emoticons, transport, supplemental
+            || ($cp >= 0x2600 && $cp <= 0x27BF)     // misc symbols and dingbats
+            || ($cp >= 0x2B00 && $cp <= 0x2BFF)     // misc symbols and arrows
+            || ($cp >= 0x2190 && $cp <= 0x21FF)     // arrows
+            || ($cp >= 0x2300 && $cp <= 0x23FF)     // misc technical, incl. ⏰ ⏳
+            || ($cp >= 0x2900 && $cp <= 0x297F)     // supplemental arrows
+            || $cp === 0x00A9 || $cp === 0x00AE     // © ®
+            || $cp === 0x2122;                      // ™
+    }
+
+    /** Characters that only ever decorate a pictograph. */
+    private function isEmojiModifier(int $cp): bool
+    {
+        return $cp === 0xFE0F || $cp === 0xFE0E        // variation selectors
+            || $cp === 0x200D                          // zero-width joiner
+            || ($cp >= 0x1F3FB && $cp <= 0x1F3FF)      // skin tones
+            || $cp === 0x20E3                          // combining enclosing keycap
+            || ($cp >= 0xE0020 && $cp <= 0xE007F);     // tag characters, for flags
     }
 
     /** Moves the reader's cursor forward. Never backwards. */

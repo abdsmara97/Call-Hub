@@ -76,7 +76,8 @@ class Conversation extends Component
             "echo-private:room.{$room},.emergency.sent" => '$refresh',
             "echo-private:room.{$room},.emergency.acknowledged" => '$refresh',
             "echo-private:room.{$room},.emergency.resolved" => '$refresh',
-            "echo-private:room.{$room},.poll.updated" => 'onPollUpdated',
+            "echo-private:room.{$room},.poll.updated" => 'refreshTimeline',
+            "echo-private:room.{$room},.message.reacted" => 'refreshTimeline',
             'emergency-acknowledged' => '$refresh',
         ];
     }
@@ -118,8 +119,10 @@ class Conversation extends Component
                 // query per poll per row.
                 'poll.options',
                 'poll.votes',
+                'reactions.user',
                 'replies.author',
                 'replies.attachments',
+                'replies.reactions.user',
             ])
             ->withCount('replies')
             ->latest('id')
@@ -308,6 +311,23 @@ class Conversation extends Component
         unset($this->timeline);
     }
 
+    public function react(int $messageId, string $emoji, MessageService $messages): void
+    {
+        $message = Message::findOrFail($messageId);
+
+        Gate::authorize('react', $message);
+
+        try {
+            $messages->toggleReaction($message, auth()->user(), $emoji);
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('reaction', $e->getMessage());
+
+            return;
+        }
+
+        unset($this->timeline);
+    }
+
     public function toggleSave(int $messageId): void
     {
         $message = Message::findOrFail($messageId);
@@ -347,7 +367,7 @@ class Conversation extends Component
 
     // ------------------------------------------------------------------ polls
 
-    public function onPollUpdated(): void
+    public function refreshTimeline(): void
     {
         unset($this->timeline);
     }
