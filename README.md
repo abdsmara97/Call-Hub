@@ -10,6 +10,34 @@ because an administrator created or imported them.
 
 ---
 
+## What it does
+
+**Messaging** — public and private rooms, plus a room per company and per
+administration that is created automatically and cannot be left. Direct messages
+are rooms with exactly two members, created on first contact. Threaded replies
+one level deep, edit and soft-delete, attachments on a private disk, typing
+indicators over presence whispers, per-member read cursors, and full-text search
+scoped to the rooms you can actually read.
+
+**Emergencies** — the headline feature; see the next section.
+
+**Everything else in a room** — pinned announcements, polls with live results,
+saved messages.
+
+**Notifications** — unread counts, a room that blinks when a message lands in it,
+and a desktop pop-up when the tab is in the background. Quiet hours silence
+ordinary messages; emergencies ignore them.
+
+**Administration** — user CRUD, suspend and reactivate, a downloadable CSV
+template and queued bulk import with a per-row rejection report, org-wide
+emergency broadcast, an exportable emergency log, a misuse report, and editable
+escalation and rate-limit settings.
+
+**Self-service** — photo, phone, status message, availability, Do Not Disturb
+schedule, and the notification toggle.
+
+---
+
 ## The emergency system
 
 This is the reason the product exists, so it is worth stating plainly what it
@@ -43,6 +71,29 @@ something to count.
 
 ---
 
+## Desktop notifications
+
+Two separate mechanisms, easy to confuse:
+
+| | Ordinary messages | Emergencies |
+|---|---|---|
+| Mechanism | browser `Notification` API | Web Push + service worker |
+| Works when tab is backgrounded | yes | yes |
+| Works when the browser is **closed** | no | yes |
+| Needs VAPID keys | no | yes |
+| Obeys Do Not Disturb | yes | **never** |
+| User can switch off | yes, in Profile | no |
+
+A message pop-up fires only when the tab is **hidden** — if you are looking at
+the Hub, the blinking room in the sidebar has already told you, and a pop-up on
+top of that is noise. It stays silent for your own messages, for emergencies
+(which have their own overlay), and for any room you can no longer read.
+
+Each person allows notifications once per browser, from **Profile → Browser
+notifications**.
+
+---
+
 ## Stack
 
 | | |
@@ -71,7 +122,8 @@ npm install
 cp .env.example .env
 php artisan key:generate
 
-# Browser push needs a VAPID pair.
+# Only needed for emergency push (the browser-closed kind). See the OpenSSL
+# note under Known gaps if this errors with "Unable to create the key".
 php artisan webpush:vapid
 
 touch database/database.sqlite
@@ -94,7 +146,13 @@ php artisan schedule:work    # drives the emergency escalation sweep
 ```
 
 Without `reverb:start` the app still works, but nothing is live: messages need a
-refresh and emergency overlays never appear.
+refresh and emergency overlays never appear. This is the single most common
+"why is it broken" — check Reverb is actually running before anything else.
+
+**Port 8080 is a common clash.** XAMPP, WAMP and a stock Apache all take it, and
+Reverb then dies with a socket permission error. If that happens, move it — set
+`REVERB_PORT` and `REVERB_SERVER_PORT` to something free (8085 works), then
+`npm run build`, because the port is compiled into the front-end bundle.
 
 ### Seeded accounts
 
@@ -114,7 +172,7 @@ screen until they set their own.
 ## Testing
 
 ```bash
-php artisan test                       # Pest: 122 tests
+php artisan test                       # Pest: 185 tests
 php artisan test --filter=Security     # the authorisation matrix
 ```
 
@@ -199,10 +257,31 @@ Three, with different deadlines — see `config/horizon.php`:
 
 ## Known gaps
 
+**OpenSSL on the current dev machine.** `OPENSSL_CONF` points at
+`C:\Program Files\PostgreSQL\psqlODBC\etc\openssl.cnf`, which does not exist —
+and no `openssl.cnf` exists anywhere on the machine. PHP's EC key generation
+therefore fails, which blocks:
+
+- `php artisan webpush:vapid`, and so emergency push to a **closed** browser;
+- `php artisan dusk:chrome-driver`, and so the whole browser suite.
+
+It is a Windows environment setting, not a project bug. Point `OPENSSL_CONF` at
+a valid `openssl.cnf` (a minimal one with a `[req]` section carrying
+`default_bits` is enough) and both unblock. Message notifications and everything
+else in the app are unaffected.
+
+**Other gaps:**
+
 - `vendor/bin/pint` is unusable in this checkout: the vendored phar carries a
   baked-in path from an unrelated project. Reinstall it before relying on
   `pint --test` in CI.
-- The Dusk suite has never been executed end to end here — ChromeDriver could
-  not be downloaded in the build environment. The tests are written against the
-  real selectors, but treat the first run as unproven.
+- The Dusk suite has never been executed end to end — see the OpenSSL note. The
+  tests are written against the real selectors and routes, but treat the first
+  run as unproven.
+- Real-time delivery is verified server-side and by feature tests, but no one has
+  yet watched two browsers exchange a message live.
+- Per-room muting is unbuilt. `room_members.is_muted` exists and is read nowhere;
+  it is the natural home for it.
+- No mention detection (`@name`), so notifications cannot be narrowed to "only
+  when I am named".
 - No CI pipeline yet.
