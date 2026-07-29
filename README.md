@@ -229,6 +229,74 @@ Three, with different deadlines — see `config/horizon.php`:
 
 ---
 
+## Hosting on Google Cloud
+
+Nothing in the app needs to change to run on GCP. It is an ordinary Laravel and
+MySQL stack, so the managed services map straight onto it:
+
+| Piece | Google Cloud service | Change needed |
+|---|---|---|
+| Database | **Cloud SQL for MySQL 8** | `DB_*` env vars |
+| Queues and cache | **Memorystore for Redis** | `QUEUE_CONNECTION`, `CACHE_STORE`, `REDIS_*` |
+| Attachments and avatars | **Cloud Storage** | `HUB_ATTACHMENT_DRIVER=s3` plus the S3-compatible keys |
+| App and Reverb | **Compute Engine VM** | none — `deploy/` already covers nginx and Supervisor |
+| Scheduler | the cron in `deploy/cron/` | none |
+
+**Put Reverb on a VM, not Cloud Run.** It holds WebSocket connections open for
+minutes at a time between events, and Cloud Run reaps idle connections. Losing
+them does not break the app, but it silently stops being real time — which is
+the failure mode hardest to notice.
+
+Cloud Storage exposes an S3-compatible API, so `league/flysystem-aws-s3-v3`
+(already required) works against it via HMAC interoperability keys. Point
+`AWS_ENDPOINT` at `https://storage.googleapis.com`.
+
+### Why not Firestore
+
+Worth recording, because "hosted on Google Cloud" and "uses Firebase" get
+conflated. The data model here is relational on purpose, and several product
+guarantees are enforced by the database rather than by application code:
+
+- **17 unique indexes** — one vote per person per poll, one reaction per person
+  per emoji, one DM room per pair, one acknowledgement per emergency recipient.
+- **Multi-table transactions** in eight places, most importantly the emergency
+  recipient snapshot, which is written atomically with the message so the audit
+  trail can never half-exist.
+- **Foreign keys with cascade rules** across ten migrations.
+- **A `FULLTEXT` index** on `messages.body`, which is what message search is.
+- **Relational reads** — `whereHas`, `withCount`, grouped tallies — in more than
+  twenty places.
+
+Firestore offers none of the first four. Moving would mean reimplementing those
+guarantees in application code, which is precisely where audit trails go wrong.
+Cloud SQL gives the same managed-service benefits with none of that risk.
+
+Firebase Cloud Messaging is a separate question and would be a reasonable way to
+deliver push without VAPID; it does not require touching the database.
+
+### Storage growth
+
+Messages are cheap. Each costs roughly **384 bytes** including every index:
+
+| Usage across 1,000 staff | Per year | After 5 years |
+|---|---|---|
+| Light — 5 messages/person/day | 0.65 GB | 3.3 GB |
+| Normal — 20 messages/person/day | 2.6 GB | 13 GB |
+| Heavy — 50 messages/person/day | 6.5 GB | 33 GB |
+
+Storage will not be the constraint — the CPU and memory tier will bite long
+first. **Attachments are what actually grow**: they live in object storage, not
+the database, and at two 1 MB files per person per day they run to roughly
+700 GB a year, some 300× the message text. That is the number to budget.
+
+Read receipts are the reason the message table stays this small. Storing one
+receipt per person per message would add about **10 GB every year** at normal
+usage. The per-member read cursor used instead (see §1 of `docs/PLAN.md`) is
+**under 1 MB in total and does not grow with message volume**, while still
+answering "who has read this".
+
+---
+
 ## Security notes
 
 - Every room, message and emergency route is behind a policy, checked at
