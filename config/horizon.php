@@ -196,34 +196,98 @@ return [
     |
     */
 
+    /*
+     * Three supervisors, because the three kinds of work here have genuinely
+     * different deadlines:
+     *
+     *   emergency — alert fan-out and escalation. Isolated so nothing else can
+     *               ever queue in front of it. `nice` is negative to win the
+     *               CPU when the box is busy.
+     *   default   — broadcast events, Scout indexing, mail. Ordinary latency.
+     *   imports   — the employee CSV. Minutes-long, single worker, and given a
+     *               timeout longer than the job's own 600s so the worker never
+     *               kills a run mid-file.
+     *
+     * The stock config shipped a single supervisor watching only `default`,
+     * which would have left every emergency job unprocessed in production.
+     */
     'defaults' => [
-        'supervisor-1' => [
+        'supervisor-emergency' => [
+            'connection' => 'redis',
+            'queue' => ['emergency'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 3,
+            'timeout' => 60,
+            'nice' => -5,
+        ],
+
+        'supervisor-default' => [
             'connection' => 'redis',
             'queue' => ['default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => 1,
+            'minProcesses' => 1,
+            'maxProcesses' => 3,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
-            'tries' => 1,
+            'tries' => 3,
             'timeout' => 60,
             'nice' => 0,
+        ],
+
+        'supervisor-imports' => [
+            'connection' => 'redis',
+            'queue' => ['imports'],
+            'balance' => 'simple',
+            'minProcesses' => 1,
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 900,
+            'nice' => 5,
         ],
     ],
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
-                'maxProcesses' => 10,
+            'supervisor-emergency' => [
+                'minProcesses' => 2,
+                'maxProcesses' => 12,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 2,
+            ],
+
+            'supervisor-default' => [
+                'maxProcesses' => 8,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
+            ],
+
+            'supervisor-imports' => [
+                'maxProcesses' => 2,
             ],
         ],
 
         'local' => [
-            'supervisor-1' => [
-                'maxProcesses' => 3,
+            'supervisor-emergency' => [
+                'maxProcesses' => 2,
+            ],
+
+            'supervisor-default' => [
+                'maxProcesses' => 2,
+            ],
+
+            'supervisor-imports' => [
+                'maxProcesses' => 1,
             ],
         ],
     ],

@@ -30,7 +30,11 @@ class ProcessEmployeeImport implements ShouldQueue
     public function __construct(
         public readonly string $path,
         public readonly int $actorId,
-    ) {}
+    ) {
+        // Its own queue: a 2,000-row import runs for minutes, and must never
+        // sit in front of an emergency fan-out or a broadcast event.
+        $this->onQueue('imports');
+    }
 
     public function handle(UserProvisioner $provisioner): void
     {
