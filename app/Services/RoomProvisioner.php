@@ -131,12 +131,14 @@ class RoomProvisioner
             throw new \InvalidArgumentException('A direct message needs two different people.');
         }
 
+        // `has(..., '=', 2)` puts the count in a WHERE subquery. A withCount()
+        // plus having() reads the same but is invalid without a GROUP BY, and
+        // SQLite rejects it outright.
         $existing = Room::query()
             ->conversations()
             ->whereHas('memberships', fn ($q) => $q->where('user_id', $a->getKey()))
             ->whereHas('memberships', fn ($q) => $q->where('user_id', $b->getKey()))
-            ->withCount('memberships')
-            ->having('memberships_count', '=', 2)
+            ->has('memberships', '=', 2)
             ->first();
 
         if ($existing) {
