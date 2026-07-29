@@ -18,8 +18,13 @@ export function registerMentionAutocomplete(Alpine) {
         at: null, // character offset of the '@' being completed
         highlighted: 0,
 
+        /**
+         * Gated on there being an active '@', NOT on `open` — scan() decides
+         * whether to open by asking how many results there are, so keying this
+         * off `open` deadlocks: it returns nothing, so nothing ever opens.
+         */
         get results() {
-            if (! this.open) return [];
+            if (this.at === null) return [];
 
             const q = this.query.toLowerCase();
 
