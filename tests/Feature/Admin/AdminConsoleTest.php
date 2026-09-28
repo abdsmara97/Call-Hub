@@ -5,7 +5,9 @@ use App\Livewire\Admin\UserImport;
 use App\Livewire\Admin\UserManager;
 use App\Models\Administration;
 use App\Models\Company;
+use App\Models\Setting;
 use App\Models\User;
+use App\Support\HubSettings as HubSettingsReader;
 use App\Support\Permissions;
 use Database\Seeders\OrganisationSeeder;
 use Database\Seeders\RoleSeeder;
@@ -129,6 +131,54 @@ it('validates hub settings ranges', function () {
             'escalationIntervalMinutes', 'maxEscalations', 'rateLimitPerWindow',
             'rateLimitWindowMinutes', 'rateLimitPerDay', 'misuseThresholdPerWeek',
         ]);
+});
+
+it('validates the huddle size limit', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(HubSettings::class)
+        ->set('huddleMaxParticipants', 1)
+        ->call('save')
+        ->assertHasErrors('huddleMaxParticipants');
+
+    // A huddle is N-squared; past a hundred the egress and the socket fan-out
+    // both stop being credible, and nobody should discover that mid-all-hands.
+    Livewire::test(HubSettings::class)
+        ->set('huddleMaxParticipants', 500)
+        ->call('save')
+        ->assertHasErrors('huddleMaxParticipants');
+});
+
+/*
+ * The (int) trap the component's own comment warns about: a boolean written
+ * through the integer map would store 1/0 and read back as a truthy string, so
+ * the kill switch would be permanently on.
+ */
+it('stores the huddle kill switch as a real boolean', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(HubSettings::class)
+        ->set('huddlesEnabled', false)
+        ->set('huddleMaxParticipants', 12)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(Setting::get('huddles.enabled'))->toBeFalse()
+        ->and(Setting::get('huddles.max_participants'))->toBe(12)
+        ->and(app(HubSettingsReader::class)->huddlesEnabled())->toBeFalse();
+});
+
+it('leaves calling alone when huddles are turned off', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(HubSettings::class)
+        ->set('huddlesEnabled', false)
+        ->set('callsEnabled', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(app(HubSettingsReader::class)->huddlesEnabled())->toBeFalse()
+        ->and(app(HubSettingsReader::class)->callsEnabled())->toBeTrue();
 });
 
 it('queues the import job and rejects a non-CSV upload', function () {

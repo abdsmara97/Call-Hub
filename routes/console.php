@@ -11,6 +11,20 @@ Schedule::command('emergency:sweep')
     ->withoutOverlapping()
     ->runInBackground();
 
+/*
+ * The huddle backstop, and it is not optional.
+ *
+ * Webhooks are the fast path and they are lossy. Without this, a dropped
+ * participant_left leaves a "Call in progress" banner nobody can clear, a cache
+ * flush loses every roster, and — the one that matters — a suspended account
+ * stays inside a live huddle indefinitely, because there is no next HTTP request
+ * for EnsureAccountIsActive to run on.
+ */
+Schedule::command('huddles:reconcile')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Sessions and expired temporary data.
 Schedule::command('auth:clear-resets')->daily();
 

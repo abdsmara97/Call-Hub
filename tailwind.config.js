@@ -22,6 +22,10 @@ export default {
         // presence colours live. Without this the JIT never sees them and the
         // status dot renders with no background at all.
         './app/Enums/**/*.php',
+        // Same problem again: huddle-machine.js picks a column class from the
+        // participant count. Without this the JIT never sees grid-cols-3 and a
+        // nine-person huddle renders as a single tall column.
+        './resources/js/**/*.js',
     ],
 
     theme: {
@@ -135,6 +139,7 @@ export default {
             zIndex: {
                 sticky: 'var(--z-sticky)',
                 dropdown: 'var(--z-dropdown)',
+                huddle: 'var(--z-huddle)',
                 modal: 'var(--z-modal)',
                 toast: 'var(--z-toast)',
                 emergency: 'var(--z-emergency)',

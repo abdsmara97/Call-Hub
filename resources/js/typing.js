@@ -11,6 +11,8 @@
  * every name carries its own expiry and is dropped when it goes stale.
  */
 
+import { joinRoomPresence, releaseRoomPresence } from './presence.js';
+
 const HEARTBEAT_MS = 1500; // how often a typist re-announces while typing
 const EXPIRY_MS = 4000;    // how long a name survives without a new heartbeat
 const SWEEP_MS = 1000;
@@ -22,25 +24,31 @@ export function registerTypingIndicator(Alpine) {
         channel: null,
         lastSent: 0,
         sweep: null,
+        handlers: {},
 
         init() {
-            if (! window.Echo) return;
+            // Shared with call signalling, so this is a hold rather than an
+            // exclusive claim — see presence.js.
+            this.channel = joinRoomPresence(roomId);
 
-            this.channel = window.Echo.join(`presence.room.${roomId}`);
+            if (! this.channel) return;
 
-            this.channel.listenForWhisper('typing', (payload) => {
+            this.handlers.typing = (payload) => {
                 if (! payload?.name || payload.id === me.id) return;
 
                 this.typists = { ...this.typists, [payload.name]: Date.now() + EXPIRY_MS };
-            });
+            };
 
             // Someone who sends stops typing; clear them immediately rather
             // than waiting out the expiry.
-            this.channel.listenForWhisper('stopped-typing', (payload) => {
+            this.handlers.stopped = (payload) => {
                 if (! payload?.name) return;
 
                 this.forget(payload.name);
-            });
+            };
+
+            this.channel.listenForWhisper('typing', this.handlers.typing);
+            this.channel.listenForWhisper('stopped-typing', this.handlers.stopped);
 
             this.sweep = window.setInterval(() => this.expire(), SWEEP_MS);
 
@@ -50,9 +58,16 @@ export function registerTypingIndicator(Alpine) {
         destroy() {
             if (this.sweep) window.clearInterval(this.sweep);
 
-            if (this.channel && window.Echo) {
-                window.Echo.leave(`presence.room.${roomId}`);
-            }
+            if (! this.channel) return;
+
+            // Unbind only what this component bound. A call may still be
+            // negotiating on the same channel.
+            this.channel.stopListeningForWhisper('typing', this.handlers.typing);
+            this.channel.stopListeningForWhisper('stopped-typing', this.handlers.stopped);
+
+            this.channel = null;
+
+            releaseRoomPresence(roomId);
         },
 
         /** Called on every keystroke in the composer; throttled to a heartbeat. */

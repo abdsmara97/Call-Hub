@@ -51,8 +51,9 @@
                     </div>
                 </form>
             @else
-                {{-- A poll's body is its question, which the card already shows. --}}
-                @if (filled($message->body) && ! $message->poll)
+                {{-- A poll's body is its question and a form's is its title,
+                     both of which the card below already shows. --}}
+                @if (filled($message->body) && ! $message->poll && ! $message->formPosting)
                     <x-message-body :message="$message"
                                     class="mt-0.5 text-base {{ $isEmergency ? 'font-medium text-content' : 'text-content' }}" />
                 @endif
@@ -84,6 +85,10 @@
 
                 @if ($message->poll)
                     @include('livewire.hub.partials.poll-card', ['poll' => $message->poll])
+                @endif
+
+                @if ($message->formPosting?->form)
+                    @include('livewire.hub.partials.form-card', ['form' => $message->formPosting->form])
                 @endif
             @endif
 

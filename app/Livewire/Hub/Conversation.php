@@ -4,18 +4,24 @@ namespace App\Livewire\Hub;
 
 use App\Exceptions\EmergencyRateLimited;
 use App\Models\Emergency;
+use App\Models\Form;
 use App\Models\Message;
 use App\Models\PinnedMessage;
 use App\Models\Poll;
 use App\Models\Room;
 use App\Models\SavedMessage;
 use App\Services\EmergencyService;
+use App\Services\FormService;
+use App\Services\HuddleRegistry;
 use App\Services\MessageService;
 use App\Services\PollService;
+use App\Services\RoomProvisioner;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 class Conversation extends Component
@@ -26,7 +32,7 @@ class Conversation extends Component
 
     public string $body = '';
 
-    /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
+    /** @var array<int, TemporaryUploadedFile> */
     public array $uploads = [];
 
     public ?int $replyTo = null;
@@ -51,6 +57,9 @@ class Conversation extends Component
     public array $pollOptions = ['', ''];
 
     public string $pollClosesAt = '';
+
+    /** Form picker. Forms are written in the admin area; here you only choose one. */
+    public bool $formPickerOpen = false;
 
     /** @var array<int, bool> */
     public array $openThreads = [];
@@ -77,6 +86,7 @@ class Conversation extends Component
             "echo-private:room.{$room},.emergency.acknowledged" => '$refresh',
             "echo-private:room.{$room},.emergency.resolved" => '$refresh',
             "echo-private:room.{$room},.poll.updated" => 'refreshTimeline',
+            "echo-private:room.{$room},.form.updated" => 'refreshTimeline',
             "echo-private:room.{$room},.message.reacted" => 'refreshTimeline',
             'emergency-acknowledged' => '$refresh',
         ];
@@ -116,9 +126,12 @@ class Conversation extends Component
                 'attachments',
                 'emergency.recipients.user',
                 // Options and votes come along so the tally renders without a
-                // query per poll per row.
+                // query per poll per row. Same reasoning for a form's fields
+                // and responses, which its card counts.
                 'poll.options',
                 'poll.votes',
+                'formPosting.form.fields',
+                'formPosting.form.responses',
                 'reactions.user',
                 'mentions',
                 'replies.author',
@@ -249,13 +262,47 @@ class Conversation extends Component
         $this->dispatch('message-received');
     }
 
+    /**
+     * Bounds the whole selection, not each file.
+     *
+     * Every chosen file travels in one request, so the per-file limit alone
+     * would let five attachments at full size become a single 200 MB POST.
+     * Checked here rather than at the web server so the sender is told the
+     * batch is too large, instead of the request dying with a bare 413.
+     */
+    private function batchWithinLimit(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            $ceiling = (int) config('hub.attachments.max_batch_kilobytes');
+
+            if (! is_array($value) || $ceiling <= 0) {
+                return;
+            }
+
+            $kilobytes = array_sum(array_map(
+                fn ($file) => is_object($file) && method_exists($file, 'getSize')
+                    ? (int) ceil($file->getSize() / 1024)
+                    : 0,
+                $value,
+            ));
+
+            if ($kilobytes > $ceiling) {
+                $fail(sprintf(
+                    'These attachments come to %s MB together, which is over the %s MB limit for one message. Send them separately.',
+                    number_format($kilobytes / 1024, 1),
+                    number_format($ceiling / 1024),
+                ));
+            }
+        };
+    }
+
     public function send(MessageService $messages, EmergencyService $emergencies): void
     {
         Gate::authorize('post', $this->room);
 
         $rules = [
             'body' => [$this->uploads === [] ? 'required' : 'nullable', 'string', 'max:'.config('hub.messages.max_length')],
-            'uploads' => ['array', 'max:5'],
+            'uploads' => ['array', 'max:5', $this->batchWithinLimit()],
             'uploads.*' => [
                 'file',
                 'max:'.config('hub.attachments.max_kilobytes'),
@@ -494,7 +541,7 @@ class Conversation extends Component
                 $this->room,
                 $this->pollQuestion,
                 $this->pollOptions,
-                $this->pollClosesAt !== '' ? \Carbon\CarbonImmutable::parse($this->pollClosesAt) : null,
+                $this->pollClosesAt !== '' ? CarbonImmutable::parse($this->pollClosesAt) : null,
             );
         } catch (\InvalidArgumentException $e) {
             $this->addError('pollOptions', $e->getMessage());
@@ -536,6 +583,65 @@ class Conversation extends Component
         unset($this->timeline);
     }
 
+    // ------------------------------------------------------------------ forms
+
+    /**
+     * The forms that can be sent into this conversation: open, actually asking
+     * something, and not already here. A form sent twice would give people two
+     * cards leading to one response.
+     *
+     * @return Collection<int, Form>
+     */
+    #[Computed]
+    public function sendableForms(): Collection
+    {
+        if (! Gate::allows('postIn', [Form::class, $this->room])) {
+            return collect();
+        }
+
+        return Form::query()
+            ->where(fn ($q) => $q->whereNull('closes_at')->orWhere('closes_at', '>', now()))
+            ->has('fields')
+            ->whereDoesntHave('postings', fn ($q) => $q->where('room_id', $this->roomId))
+            ->withCount('fields')
+            ->latest()
+            ->limit(50)
+            ->get();
+    }
+
+    public function openFormPicker(): void
+    {
+        Gate::authorize('postIn', [Form::class, $this->room]);
+
+        unset($this->sendableForms);
+        $this->formPickerOpen = true;
+    }
+
+    public function closeFormPicker(): void
+    {
+        $this->formPickerOpen = false;
+    }
+
+    public function sendForm(int $formId, FormService $forms): void
+    {
+        Gate::authorize('postIn', [Form::class, $this->room]);
+
+        $form = Form::findOrFail($formId);
+
+        try {
+            $forms->postTo($form, auth()->user(), $this->room);
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('form', $e->getMessage());
+
+            return;
+        }
+
+        $this->formPickerOpen = false;
+        unset($this->sendableForms);
+
+        $this->afterSend();
+    }
+
     public function toggleThread(int $messageId): void
     {
         if (isset($this->openThreads[$messageId])) {
@@ -564,7 +670,7 @@ class Conversation extends Component
         unset($this->timeline);
     }
 
-    public function leaveRoom(\App\Services\RoomProvisioner $rooms): void
+    public function leaveRoom(RoomProvisioner $rooms): void
     {
         Gate::authorize('leave', $this->room);
 
@@ -590,8 +696,36 @@ class Conversation extends Component
         return str_replace(['%', '_'], ['\%', '\_'], $term);
     }
 
-    public function render()
+    /**
+     * The huddle roster as it stands when the page renders.
+     *
+     * After this, the banner updates itself over the room's private channel and
+     * never asks the server again — a Livewire round-trip per join and leave,
+     * multiplied by every member of a company-wide room, is not a thing this
+     * feature can afford.
+     *
+     * ensureFresh() is the read-path half of reconciliation: a missing live
+     * index means the cache was flushed rather than that nobody is huddling, and
+     * this rebuilds it once rather than leaving every banner in the hub blank
+     * until the scheduled sweep next runs.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function huddleSnapshot(HuddleRegistry $huddles): ?array
     {
-        return view('livewire.hub.conversation');
+        if (! Gate::allows('huddle', $this->room)) {
+            return null;
+        }
+
+        $huddles->ensureFresh();
+
+        return $huddles->snapshot($this->room->getKey());
+    }
+
+    public function render(HuddleRegistry $huddles)
+    {
+        return view('livewire.hub.conversation', [
+            'huddleSnapshot' => $this->huddleSnapshot($huddles),
+        ]);
     }
 }

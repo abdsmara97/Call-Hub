@@ -16,6 +16,17 @@
     [hidden] {
         display: none !important;
     }
+
+    /*
+     * Alpine ships no stylesheet, so x-cloak means nothing until this rule
+     * exists — and the huddle dock, both call panels, the emoji panel and the
+     * sidebar all rely on it. Without it each one paints for a frame before
+     * Alpine boots and hides it, which on the call panel is an incoming-call
+     * card flashing up on every page load.
+     */
+    [x-cloak] {
+        display: none !important;
+    }
 }
 
 @layer components {

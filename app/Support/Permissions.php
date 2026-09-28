@@ -20,6 +20,16 @@ final class Permissions
 
     public const MANAGE_SETTINGS = 'settings.manage';
 
+    /**
+     * Posting a form, and reading what people answered.
+     *
+     * Its own permission rather than a reuse of MANAGE_ROOMS: a form collects
+     * named answers from staff, which is a different kind of authority from
+     * renaming a channel, and one an installation may want to hand out
+     * separately.
+     */
+    public const MANAGE_FORMS = 'forms.manage';
+
     /** @return list<string> */
     public static function all(): array
     {
@@ -30,6 +40,7 @@ final class Permissions
             self::BROADCAST_EMERGENCY,
             self::VIEW_EMERGENCY_LOG,
             self::MANAGE_SETTINGS,
+            self::MANAGE_FORMS,
         ];
     }
 

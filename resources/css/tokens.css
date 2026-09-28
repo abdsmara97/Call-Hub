@@ -181,6 +181,7 @@
   /* --------------------------------------------------------------- z-index */
   --z-sticky: 20;
   --z-dropdown: 40;
+  --z-huddle: 55;     /* below the call panel: a ringing phone always wins */
   --z-modal: 60;
   --z-toast: 70;
   --z-emergency: 90;  /* emergency overlay outranks everything else */

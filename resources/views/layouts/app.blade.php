@@ -47,6 +47,34 @@
     @auth
         @livewire('hub.emergency-alerts')
         @livewire('hub.message-notifier')
+        {{-- Same reasoning as the emergency surface: a call has to reach you
+             wherever you are, including a room that is not the one it came from. --}}
+        @livewire('hub.call-panel')
+
+        {{--
+            The huddle dock.
+
+            @persist, not merely wire:ignore. wire:navigate swaps the whole body
+            when you click another room in the sidebar, and wire:ignore protects
+            against a Livewire re-render but not against navigation. A huddle you
+            cannot walk away from while it runs defeats its own premise — the
+            entire point is reading the conversation, and other rooms, while you
+            are in one. @persist keeps this exact subtree, and with it the
+            LiveKit Room living in the Alpine closure.
+
+            Sits at z-huddle, below the call panel's z-modal: an incoming call
+            must always be able to cover a huddle, never the other way round.
+        --}}
+        @persist('huddle-dock')
+            @include('partials.huddle-dock', [
+                'huddleMe' => [
+                    'id' => auth()->id(),
+                    'name' => auth()->user()?->name,
+                    'avatar_url' => auth()->user()?->avatar_url,
+                ],
+                'huddleConfig' => [],
+            ])
+        @endpersist
     @endauth
 
     {{-- Screen readers get every emergency announced here. --}}

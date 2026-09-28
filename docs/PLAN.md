@@ -187,8 +187,10 @@ Policies: `RoomPolicy` (view/join/post/moderate), `MessagePolicy` (update/delete
 | M3 — Emergency system | **Done** |
 | M4 — Add-ons | **Done** |
 | M5 — Hardening & deploy | **Done** |
+| M6 — 1:1 calling | **Done** |
 
-Test suite: 122 Pest tests passing, plus a Dusk suite for the emergency paths.
+Test suite: 293 Pest tests passing and 62 node tests, plus a Dusk suite for the
+emergency paths.
 
 Three bugs the M5 pass found, all of which would have shipped:
 
@@ -222,6 +224,116 @@ Still open, and deliberately not papered over:
 **M4 — Add-ons.** Availability status + presence channel, employee directory (filter by company/administration/role), pinned announcements, polls, saved messages, DND schedule with hard emergency override.
 
 **M5 — Hardening & deploy.** Security pass (uploads, authz matrix, rate limits), Horizon, Dusk suite for emergency paths, Supervisor + nginx + Reverb deployment configs, README finalized.
+
+**M6 — 1:1 calling.** WebRTC audio and video between the two members of a direct
+message. *Done = two browsers on different networks hold a call, and the
+authorisation, Do Not Disturb and state-machine paths are covered by tests.*
+
+The shape of it, and why:
+
+- **Direct messages only, strictly two people.** Peer-to-peer mesh works at two
+  and degrades fast beyond four; company and administration rooms have hundreds
+  of members. Group calling would need a selective forwarding unit — a second
+  backend, not a feature — so `RoomPolicy::call()` fails closed rather than
+  half-working. *(M7 built that second backend. This constraint still describes
+  `call()`, which is unchanged; group audio lives beside it as huddles, never
+  through the mesh.)*
+- **No `calls` table, and no migration.** Media never reaches the server, so
+  there is nothing to record even if we wanted to; a half-record of who rang
+  whom would be an audit trail that cannot be trusted, which is the opposite of
+  what this product is for. A missed call instead offers to send an ordinary
+  message, which lands in the durable medium the hub already has.
+- **The ring is a server broadcast; everything else is a whisper.** Ringing
+  reuses the personal channel that makes emergencies reach someone in another
+  room. Accept, decline, SDP, ICE and hangup are client events on
+  `presence.room.{id}` and never reach PHP — a whole call setup costs less
+  socket traffic than one person typing for two seconds.
+- **Do Not Disturb silences the ring, it does not block it.** Emergencies
+  override DND and messages obey it; a call sits between, so it arrives without
+  a sound and the caller is told, and can judge whether it warrants the
+  emergency flag. Off shift is the one state that blocks outright — a roster
+  fact, not a preference. Calls never escalate and never re-ring.
+- **The state machine is a pure reducer** (`resources/js/call-machine.js`).
+  Eight states, six timeouts, and glare when both people dial at once — none of
+  it observable in a browser test without two machines. Kept pure it is checked
+  in node in milliseconds.
+- **Perfect negotiation, with politeness derived from user ids.** Not from
+  caller/callee: after a glare collapse there is no caller, and both sides would
+  compute the same answer — the one thing the pattern must never allow.
+
+Two constraints worth recording:
+
+- `REVERB_APP_MAX_MESSAGE_SIZE` and `REVERB_MAX_REQUEST_SIZE` are raised to
+  32,000. The 10,000 default is sized for chat; trickle ICE keeps candidates
+  small but a Chrome SDP offer carrying video can exceed it, and Reverb closes
+  the connection rather than truncating. `CallAuthorizationTest` asserts the
+  client's own guard stays below whatever the socket allows.
+- `Echo.leave()` tears down the public, private and presence variants of a name
+  at once, so it was never safe for two features to share a channel.
+  `resources/js/presence.js` reference-counts the room presence channel; without
+  it, leaving a conversation would drop a call that was still negotiating.
+
+**M7 — room huddles.** Many-to-many audio, video and screen share in any room,
+through a self-hosted LiveKit SFU. Audio on joining; camera and screen are
+opt-in. *Done = several browsers hold a huddle in a channel, the banner tracks it
+live for everyone else, and the authorisation, webhook-signature and
+reconciliation paths are covered by tests.*
+
+The shape of it, and why:
+
+- **A huddle is not a call, and shares no code with one.** Separate policy
+  ability, separate settings, separate kill switch, separate rate limiter, and
+  the M6 stack was not edited at all. That separation is the safety property: 1:1
+  calling has to keep working, and keep being independently disable-able, when
+  huddles are having a bad day. Media is the reason — huddle audio crosses this
+  server and call audio does not, so they fail differently and cost differently.
+- **Any room, including the system ones.** The mesh's limits were the mesh's; an
+  SFU has none of them. `RoomPolicy::huddle()` checks membership, the kill switch
+  and whether LiveKit is configured at all, and nothing else.
+- **Nothing rings.** Starting a huddle puts a banner in the room and waits. That
+  is what makes it safe in a 300-member company room: there is no per-member
+  availability or DND fan-out because there is nothing to silence, and no way to
+  interrupt hundreds of people by accident. The banner is `role="status"`, never
+  an `alertdialog` — an announcement, not a summons.
+- **Still no table, and no migration.** Live state is a cache entry keyed by room
+  and LiveKit's own memory behind it; the LiveKit room name is derived from the
+  room id (`hub-room-{id}`) rather than stored, which is what makes the whole
+  thing possible without persistence and means two huddles cannot coexist in one
+  room by construction. When the last person leaves there is nothing left.
+- **The webhook touches no database.** Names and avatars are signed into the join
+  token's metadata with `canUpdateOwnMetadata: false`, and LiveKit hands that
+  exact string back on `participant_joined`. A fifty-person join storm is then
+  fifty cache writes rather than fifty rounds of queries.
+- **Departures are guarded on the participant sid.** Identity is `u{id}`, so a
+  second tab disconnects the first, and the old session's `participant_left` can
+  arrive after the new one's `participant_joined`. LiveKit does not order
+  webhooks; the sid guard is what makes ordering not matter.
+- **`huddles:reconcile` is not optional.** Webhooks are lossy. Once somebody is
+  inside a huddle there is no next HTTP request, so `EnsureAccountIsActive` never
+  runs again — suspension, room removal and a maximum duration are all enforced
+  from the sweep, and it is also what clears a phantom banner and heals a flushed
+  cache.
+- **The reducer and the coexistence rules are pure** (`huddle-machine.js`,
+  `huddle-arbiter.js`). The arbiter is the riskiest part of the feature — it is
+  the only thing standing between an incoming 1:1 call and two live WebRTC
+  sessions claiming one microphone — so every row of its table is asserted in
+  node rather than discovered in a browser.
+
+Three constraints worth recording:
+
+- **`firebase/php-jwt` v7, not v6.** v6 carries CVE-2025-45769, and the fix is
+  precisely the minimum HMAC key length that bites here: HS256 needs 256 bits, so
+  `livekit-server --dev` and its six-byte `secret` cannot be used with this hub
+  at all. `HuddleTokens::isConfigured()` checks the length so the policy fails
+  closed rather than the JWT library throwing a 500 when somebody presses Join.
+- **`tailwind.config.js` scans `resources/js`.** The participant grid picks a
+  column class by count, and without that content path the JIT never sees
+  `grid-cols-3` and a nine-person huddle renders as one tall column. Same trap the
+  `app/Enums` entry already documents.
+- **The broadcast payload carries at most eight participants.** Same Reverb
+  message-size ceiling as the SDP guard above, and the same consequence for
+  getting it wrong — a 200-person roster would close the socket rather than being
+  truncated. The true count travels alongside the facepile.
 
 Each milestone ends with a stop-and-summarize checkpoint, small descriptive commits throughout.
 

@@ -1,0 +1,85 @@
+# LiveKit SFU — the media server behind room huddles.
+#
+# Install to /etc/livekit/livekit.yaml, owner livekit:livekit, mode 0600.
+#
+# THIS FILE CONTAINS A SECRET. The copy in the repository is a template with the
+# value blanked, on the same discipline as .env.example: the real pair lives here
+# and in the app's .env, and nowhere else. Generate one with
+#   livekit-server generate-keys
+#
+# The secret must be at least 32 bytes. HS256 requires 256 bits of key and
+# firebase/php-jwt refuses to sign with less, so a short one makes
+# RoomPolicy::huddle() answer "no" and the huddle button simply never appears.
+
+port: 7880
+bind_addresses:
+  # Signalling and the server API are reached only through nginx (which
+  # terminates TLS on rtc.oaktreetech.com) and by the app over loopback. 7880 is
+  # never exposed to the internet, and that is what keeps /twirp — ListRooms,
+  # RemoveParticipant, DeleteRoom — off it.
+  - 127.0.0.1
+
+rtc:
+  # One UDP port for all media rather than a 10,000-port range: one firewall rule
+  # instead of a range, an order of magnitude fewer sockets, and a rule a network
+  # administrator will actually approve.
+  udp_port: 7882
+
+  # ICE over TCP, for clients whose network drops UDP outright. This one MUST be
+  # reachable from the internet directly — it is raw ICE over TCP, not HTTP, so
+  # nginx cannot proxy it the way it proxies 7880.
+  tcp_port: 7881
+
+  # A GCP VM only ever sees its own internal 10.x address. Without this, every
+  # ICE candidate it advertises is unroutable and no huddle ever connects.
+  #
+  # The explicit address is preferred over use_external_ip, which discovers it by
+  # STUN at boot: a STUN failure during a reboot would leave the SFU advertising
+  # a private address with nothing in the log to say so.
+  node_ip: 203.0.113.10          # <- replace with the VM's STATIC external IP
+  use_external_ip: false
+
+room:
+  # Only this application may create a room. A join token for a huddle that has
+  # already finished is then inert, rather than silently resurrecting an empty
+  # room and putting a phantom "Huddle in progress" banner in front of everybody.
+  auto_create: false
+
+  # Sixty seconds after the last person leaves, LiveKit closes the room and emits
+  # room_finished. The app does not wait for that — it clears the banner on the
+  # last participant_left — but this bounds the damage when a webhook is lost.
+  # Keep it in step with hub.huddles.empty_timeout_seconds.
+  empty_timeout: 60
+  departure_timeout: 20
+
+keys:
+  # Must match LIVEKIT_API_KEY / LIVEKIT_API_SECRET in the app's .env.
+  APIxxxxxxxxxxxx: ""            # <- generate; never commit the real value
+
+webhook:
+  api_key: APIxxxxxxxxxxxx
+  urls:
+    # Pin hub.oaktreetech.com to 127.0.0.1 in this VM's /etc/hosts. The
+    # certificate still validates over loopback, and the webhook then never
+    # leaves the box, never costs egress, and never depends on hairpin NAT.
+    - https://hub.oaktreetech.com/api/webhooks/livekit
+
+turn:
+  # Deliberately off. The relay of last resort is the Cloudflare TURN this hub
+  # already pays for, handed to the LiveKit client as rtcConfig.iceServers by
+  # POST /huddles/{room}/join. A relay does not need to know anything about the
+  # SFU: the client allocates on Cloudflare and we send media to the relay
+  # address, which works over TCP/TLS on 443 — the corporate-firewall case
+  # App\Services\CallCredentials was written for.
+  #
+  # Turning this on would want :443 for that same case, and nginx owns :443.
+  # Sharing it needs an nginx stream{} SNI router or a second external IP, which
+  # is real complexity to duplicate a capability we already have.
+  enabled: false
+
+logging:
+  level: info
+  json: true
+
+# Loopback only. Worth scraping before the first all-hands, not after it.
+prometheus_port: 6789

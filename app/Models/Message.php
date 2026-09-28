@@ -72,6 +72,16 @@ class Message extends Model
         return $this->hasOne(Poll::class);
     }
 
+    /**
+     * A form sent into this room is announced the same way a poll is, and for
+     * the same reasons. The message points at the posting rather than the form,
+     * because the same form can be announced in several rooms at once.
+     */
+    public function formPosting(): HasOne
+    {
+        return $this->hasOne(FormPosting::class);
+    }
+
     public function reactions(): HasMany
     {
         return $this->hasMany(MessageReaction::class);
@@ -90,13 +100,15 @@ class Message extends Model
     }
 
     /**
-     * The body split into plain runs and mentions, in order.
+     * The body split into plain runs, mentions and links, in order.
      *
      * The view renders each piece with `{{ }}`, so the app keeps its property of
      * never emitting raw HTML — highlighting a mention must not become an
-     * escape-then-inject-markup path.
+     * escape-then-inject-markup path. A link segment is the one piece carrying
+     * something other than display text, and `url` is the sanitised address
+     * rather than what the author typed; see linkSegments().
      *
-     * @return list<array{type: 'text'|'mention', text: string, user_id: int|null}>
+     * @return list<array{type: 'text'|'mention'|'link', text: string, url: string|null, user_id: int|null}>
      */
     public function bodySegments(): array
     {
@@ -109,7 +121,7 @@ class Message extends Model
         $mentions = $this->relationLoaded('mentions') ? $this->mentions : $this->mentions()->get();
 
         if ($mentions->isEmpty()) {
-            return [['type' => 'text', 'text' => $body, 'user_id' => null]];
+            return self::linkSegments($body);
         }
 
         $length = mb_strlen($body);
@@ -134,16 +146,13 @@ class Message extends Model
             }
 
             if ($start > $offset) {
-                $segments[] = [
-                    'type' => 'text',
-                    'text' => mb_substr($body, $offset, $start - $offset),
-                    'user_id' => null,
-                ];
+                array_push($segments, ...self::linkSegments(mb_substr($body, $offset, $start - $offset)));
             }
 
             $segments[] = [
                 'type' => 'mention',
                 'text' => mb_substr($body, $start, $span),
+                'url' => null,
                 'user_id' => (int) $mention->user_id,
             ];
 
@@ -151,10 +160,96 @@ class Message extends Model
         }
 
         if ($offset < $length) {
-            $segments[] = ['type' => 'text', 'text' => mb_substr($body, $offset), 'user_id' => null];
+            array_push($segments, ...self::linkSegments(mb_substr($body, $offset)));
         }
 
         return $segments;
+    }
+
+    /**
+     * A run of plain text split into ordinary text and the links inside it.
+     *
+     * Only http(s) and bare `www.` addresses are recognised, and the `url` a
+     * link segment carries is either one this method matched with an http(s)
+     * scheme or one it wrote the scheme onto itself. So `javascript:` and
+     * `data:` bodies cannot reach an href — escaping alone would not have
+     * stopped them, because escaping a URL leaves its scheme intact.
+     *
+     * Trailing punctuation is pushed back into the text run: people end
+     * sentences with a link, and "watch this (youtu.be/abc)." should not put
+     * the bracket and full stop inside the address.
+     *
+     * @return list<array{type: 'text'|'link', text: string, url: string|null, user_id: null}>
+     */
+    private static function linkSegments(string $text): array
+    {
+        if ($text === '' || ! preg_match_all('~\b(?:https?://|www\.)[^\s<>]+~iu', $text, $matches, PREG_OFFSET_CAPTURE)) {
+            return $text === '' ? [] : [['type' => 'text', 'text' => $text, 'url' => null, 'user_id' => null]];
+        }
+
+        $segments = [];
+        $offset = 0;
+
+        // Byte offsets throughout: preg_match_all reports them in bytes, and a
+        // match always begins and ends on a character boundary, so substr() is
+        // safe here in a way it would not be on an arbitrary index.
+        foreach ($matches[0] as [$match, $start]) {
+            $url = self::trimUrlTail($match);
+
+            // A scheme with no host ("https://") is text, not a link.
+            if (! preg_match('~^(?:https?://|www\.)[^\s/?#]+~i', $url)) {
+                continue;
+            }
+
+            if ($start > $offset) {
+                $segments[] = ['type' => 'text', 'text' => substr($text, $offset, $start - $offset), 'url' => null, 'user_id' => null];
+            }
+
+            $segments[] = [
+                'type' => 'link',
+                'text' => $url,
+                'url' => str_starts_with(strtolower($url), 'www.') ? 'https://'.$url : $url,
+                'user_id' => null,
+            ];
+
+            $offset = $start + strlen($url);
+        }
+
+        if ($offset < strlen($text)) {
+            $segments[] = ['type' => 'text', 'text' => substr($text, $offset), 'url' => null, 'user_id' => null];
+        }
+
+        return $segments;
+    }
+
+    /**
+     * Punctuation a URL collected from the sentence around it.
+     */
+    private static function trimUrlTail(string $url): string
+    {
+        $openers = [')' => '(', ']' => '[', '}' => '{'];
+
+        while ($url !== '') {
+            $last = $url[strlen($url) - 1];
+
+            if (str_contains('.,;:!?\'"', $last)) {
+                $url = substr($url, 0, -1);
+
+                continue;
+            }
+
+            // A closing bracket stays only if the URL opened one — Wikipedia
+            // addresses really do end in ")".
+            if (isset($openers[$last]) && substr_count($url, $openers[$last]) < substr_count($url, $last)) {
+                $url = substr($url, 0, -1);
+
+                continue;
+            }
+
+            break;
+        }
+
+        return $url;
     }
 
     /**

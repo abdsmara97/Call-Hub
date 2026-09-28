@@ -3,7 +3,7 @@
         @include('partials.admin-nav')
 
         <x-panel-heading title="Hub settings"
-                         description="How hard the emergency flag pushes, and how often anyone is allowed to raise it. Changes apply to new emergencies only — anything already in flight keeps the numbers it was sent with." />
+                         description="How hard the emergency flag pushes, how often anyone is allowed to raise it, and whether calling is available. Changes apply to new emergencies and calls only — anything already in flight keeps the numbers it was sent with." />
 
         {{-- Confirmation lives in a live region so it is not a purely visual event. --}}
         <div role="status" aria-live="polite" class="mb-4">
@@ -106,6 +106,76 @@
                             <a href="{{ route('admin.misuse') }}" class="underline">misuse report</a>.
                         </p>
                         <x-input-error :messages="$errors->get('misuseThresholdPerWeek')" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-5">
+                <h2 class="text-sm font-semibold text-content">Calling</h2>
+                <p class="mt-1 text-xs text-content-muted">
+                    One-to-one audio and video in direct messages. Calls are peer-to-peer and are never recorded.
+                </p>
+
+                <div class="mt-4 space-y-4">
+                    <label for="calls-enabled" class="flex items-start gap-3">
+                        <input id="calls-enabled" type="checkbox" class="mt-0.5 rounded border-brand-border"
+                               wire:model="callsEnabled" aria-describedby="calls-enabled-help" />
+                        <span>
+                            <span class="text-sm font-medium text-content">Allow calling</span>
+                            <span id="calls-enabled-help" class="mt-1 block text-xs text-content-subtle">
+                                Turning this off hides the call buttons and refuses any call already being placed.
+                                Calls in progress are unaffected — their audio does not pass through this server.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div class="sm:max-w-xs">
+                        <x-input-label for="call-ring-seconds" value="Ring duration (seconds)" />
+                        <input id="call-ring-seconds" type="number" inputmode="numeric" min="10" max="120"
+                               class="field" wire:model="callRingSeconds"
+                               aria-describedby="call-ring-seconds-help" />
+                        <p id="call-ring-seconds-help" class="mt-1 text-xs text-content-subtle">
+                            How long a call rings before it is given up as unanswered. Calls never escalate and
+                            never ring twice — if something genuinely cannot wait, that is what the emergency
+                            flag is for.
+                        </p>
+                        <x-input-error :messages="$errors->get('callRingSeconds')" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel p-5">
+                <h2 class="text-sm font-semibold text-content">Huddles</h2>
+                <p class="mt-1 text-xs text-content-muted">
+                    Group audio in any room. Starting a huddle rings nobody — it puts a banner in the room and
+                    people join if they want to. Huddles are never recorded.
+                </p>
+
+                <div class="mt-4 space-y-4">
+                    <label for="huddles-enabled" class="flex items-start gap-3">
+                        <input id="huddles-enabled" type="checkbox" class="mt-0.5 rounded border-brand-border"
+                               wire:model="huddlesEnabled" aria-describedby="huddles-enabled-help" />
+                        <span>
+                            <span class="text-sm font-medium text-content">Allow huddles</span>
+                            <span id="huddles-enabled-help" class="mt-1 block text-xs text-content-subtle">
+                                Separate from calling above, because huddle audio does pass through this server
+                                while one-to-one calls do not. If bandwidth is the problem, turn this off and
+                                leave calling on.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div class="sm:max-w-xs">
+                        <x-input-label for="huddle-max-participants" value="Maximum people in a huddle" />
+                        <input id="huddle-max-participants" type="number" inputmode="numeric" min="2" max="100"
+                               class="field" wire:model="huddleMaxParticipants"
+                               aria-describedby="huddle-max-participants-help" />
+                        <p id="huddle-max-participants-help" class="mt-1 text-xs text-content-subtle">
+                            Everyone in a huddle receives everyone else, so the load grows with the square of
+                            this number, not in step with it. Thirty people on audio is roughly 28&nbsp;Mbps
+                            leaving this server. Changing it does not affect a huddle already in progress.
+                        </p>
+                        <x-input-error :messages="$errors->get('huddleMaxParticipants')" />
                     </div>
                 </div>
             </div>

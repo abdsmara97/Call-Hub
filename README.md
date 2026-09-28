@@ -21,8 +21,22 @@ scoped to the rooms you can actually read.
 
 **Emergencies** — the headline feature; see the next section.
 
+**Calls** — one-to-one audio and video between the two people in a direct
+message, over WebRTC. Media is peer-to-peer and never touches the server, so
+calls are not recorded and there is no call history. Do Not Disturb rings you
+quietly rather than not at all, and the caller is told which they got. See the
+calling section below.
+
 **Everything else in a room** — pinned announcements, polls with live results,
 saved messages.
+
+**Forms** — an administrator writes a set of questions under Admin → Forms, then
+sends it into a room or a direct message by choosing it from the composer.
+Questions can ask for short text, long text, a number, yes or no, or pictures.
+The same form can go to several conversations and still collect one set of
+answers. Unlike a poll, answers are attributable: they are recorded against the
+person's name, and only the form's author and administrators can read them.
+People can correct their own answers until the form is closed.
 
 **Notifications** — unread counts, a room that blinks when a message lands in it,
 and a desktop pop-up when the tab is in the background. Quiet hours silence
@@ -71,6 +85,171 @@ something to count.
 
 ---
 
+## Calls
+
+One-to-one only, in direct messages only. Not a design compromise so much as an
+architecture boundary: peer-to-peer works at two people and falls apart past
+about four, and company and administration rooms have hundreds of members.
+Group calling would need a selective forwarding unit — a second backend to run
+and monitor, not a feature — so the policy refuses anything that is not a
+two-member DM rather than half-working.
+
+**Nothing about a call reaches the server except the ring.** Audio and video go
+browser to browser. Accept, decline, SDP, ICE and hangup travel as client
+whispers on the room's presence channel, exactly like typing indicators, so a
+whole call setup costs less socket traffic than one person typing for two
+seconds. Only the initial ring is a broadcast, because a whisper cannot reach
+someone who has not joined the channel — it goes on the personal channel, the
+same mechanism that makes an emergency find you in a different room.
+
+**Calls are ephemeral. There is no `calls` table and no call history.** With
+peer-to-peer media there is nothing to record, and a partial record of who rang
+whom would be an audit trail that cannot be trusted — the opposite of what the
+emergency log is for. A missed call instead offers to send an ordinary message,
+which lands in the medium that *is* durable.
+
+**Do Not Disturb silences a call; it does not block one.**
+
+| Callee | What happens | What the caller sees |
+|---|---|---|
+| Available or away | full ring | normal |
+| Busy, or inside a DND window | overlay, no sound | "ringing quietly" |
+| Off shift | not rung at all | "off shift" + send a message |
+| Suspended, or calling switched off | not rung at all | "cannot take calls" |
+
+Emergencies override DND and ordinary messages obey it; a call sits between.
+"Away" rings at full volume on purpose — it is a passive inference that goes
+stale, not something anyone asked for. **Calls never escalate and never
+re-ring.** One ring, one outcome. A call that chases you is an emergency with
+extra steps, and that already exists.
+
+### Configuring calls
+
+Nothing is required for local development: with no TURN provider configured the
+app falls back to public STUN, which is enough for two browsers on one machine.
+
+For real calls across networks, set `CLOUDFLARE_TURN_KEY_ID` and
+`CLOUDFLARE_TURN_API_TOKEN`. Roughly 10–20% of connections cannot get through
+corporate NAT and need a relay; Cloudflare's first 1 TB is free, which at this
+hub's size means calling costs about nothing.
+
+**Neither value ever gets a `VITE_` twin.** Unlike VAPID, there is no public
+half here. The browser receives only short-lived credentials minted per call by
+`POST /calls/{room}/ice-servers`; a static TURN password in the front-end bundle
+is how organisations end up paying for someone else's relay traffic.
+
+Administrators can switch calling off entirely, and change the ring duration, in
+**Admin → Settings** without a deploy.
+
+**Two things that will bite if changed carelessly:**
+
+1. `REVERB_APP_MAX_MESSAGE_SIZE` and `REVERB_MAX_REQUEST_SIZE` are set to
+   32,000. The 10,000 default is sized for chat, and a Chrome SDP offer carrying
+   video can exceed it — Reverb then closes the connection instead of
+   truncating, so the symptom is "turning the camera on killed the call".
+2. The nginx `Permissions-Policy` names `camera=(self), microphone=(self)`
+   explicitly. The obvious hardening edit — `camera=(), microphone=()` — breaks
+   every call in the hub with no error in any log.
+
+## Room huddles
+
+A huddle is the meeting, as opposed to the one-to-one call above. Many-to-many
+audio, video and screen share in **any** room, through a self-hosted LiveKit SFU
+rather than peer-to-peer. Audio is published on joining; camera and screen share
+are opt-in. Up to `HUB_HUDDLE_MAX_PARTICIPANTS` (30) people.
+
+Starting one **rings nobody** — it puts a "Huddle in progress" banner in the room
+and waits. That is what makes it safe in a 300-member room. There is no
+scheduling, no invite link and no lobby: membership of the room is the guest
+list. Nothing is recorded; every token is minted with `roomRecord` false and no
+Egress service is installed.
+
+### Configuring huddles
+
+Optional. Leave `LIVEKIT_*` blank and `RoomPolicy::huddle()` answers no, so the
+button is never rendered and a fresh clone runs with no extra servers.
+
+To run one locally, pin the same version the repo expects
+(`deploy/livekit/VERSION`), and use the committed throwaway config:
+
+```bash
+livekit-server --config deploy/livekit/livekit.local.yaml    # .exe on Windows
+```
+
+Then uncomment the `LIVEKIT_*` block in `.env`. Windows has no install script —
+`deploy/livekit/install-livekit.sh` is `linux_amd64` only — but the release
+publishes a `windows_amd64` build that runs against the same config file.
+
+A huddle needs more processes than chat. All four, or it half-works:
+
+```bash
+php artisan reverb:start     # the banner and the live roster
+php artisan queue:work       # BroadcastHuddleState — the trailing edge of a join burst
+php artisan schedule:work    # huddles:reconcile, every minute, not optional
+php artisan serve            # on :8000, to match the webhook URL in the local config
+```
+
+**Four things that will bite:**
+
+1. **Do not use `livekit-server --dev`.** It signs with the hard-coded six-byte
+   secret `secret`; HS256 needs 256 bits and `firebase/php-jwt` refuses to sign
+   with less, so the policy fails closed and the symptom is a huddle button that
+   simply never appears. `--dev` also sends no webhooks.
+2. **The webhook port must match.** The local config posts to
+   `http://127.0.0.1:8000/api/webhooks/livekit`. Serve on another port and the
+   webhook 404s silently — the banner never appears and never clears. This is
+   also why LiveKit in a container needs `host.docker.internal`, not loopback.
+3. **Without the scheduler, state rots.** A lost `participant_left` leaves a
+   permanent banner, and a suspended employee stays inside a live huddle
+   indefinitely — once somebody is in one there is no next request for the
+   middleware to act on.
+4. **Restarting LiveKit ends every huddle instantly.** Media flows through that
+   process, so unlike Reverb there is no drain that helps.
+
+Administrators can switch huddles off, and change the participant cap, in
+**Admin → Settings** — deliberately separate from the calling switch, so a
+bandwidth incident can stop the expensive thing without taking away free
+peer-to-peer calling.
+
+## Attachments
+
+| | |
+|---|---|
+| Per file | **40 MB** — `HUB_ATTACHMENT_MAX_KB` |
+| Per message | **80 MB** across at most 5 files — `HUB_ATTACHMENT_MAX_BATCH_KB` |
+| Types | 14, by allow-list — `config/hub.php` |
+
+The batch limit exists because Livewire posts every selected file in a single
+request. Without it, five attachments at full size would be one 200 MB POST that
+any one person could send. Two 40 MB files, or five 16 MB ones, both fit.
+
+**Raising the size means changing four things, and the lowest one always wins:**
+
+| Ceiling | Where | Value |
+|---|---|---|
+| App validation | `.env` → `HUB_ATTACHMENT_MAX_KB` | 40 MB |
+| Livewire temporary upload | `config/livewire.php` | reads the same var |
+| nginx request body | `deploy/nginx/oaktree-hub.conf` | 88M |
+| PHP | `deploy/php/oaktree-uploads.ini` | 40M / 88M |
+
+The Livewire one is the trap. Its default is 12 MB and it runs *before* any
+component validation, so a file it rejects never reaches `config/hub.php` at all
+— the setting would read 40 MB and behave as 12 MB. `config/livewire.php` is
+published here for that single reason, and reads the same env var so the two
+cannot drift. `tests/Feature/Hub/AttachmentLimitTest.php` fails if they do.
+
+PHP is the other one worth knowing about, because its failure mode is silent:
+when `post_max_size` is exceeded PHP discards the entire request body, so Laravel
+receives an empty request and cannot even report "file too large". If uploads
+fail with no explanation, check `deploy/php/oaktree-uploads.ini` is installed.
+
+**Downloads hold a PHP-FPM worker.** `AttachmentController` streams through PHP,
+so a 40 MB file on a slow connection occupies a worker for the whole transfer.
+`fastcgi_read_timeout` is raised to 300s to stop that being cut off, but that is
+a mitigation. The real fix — `X-Accel-Redirect`, or signed URLs straight to
+object storage once `HUB_ATTACHMENT_DRIVER=s3` — is unbuilt, and is worth doing
+before large attachments become routine across 1,000 people.
+
 ## Desktop notifications
 
 Two separate mechanisms, easy to confuse:
@@ -103,6 +282,7 @@ notifications**.
 | Auth | Breeze (Livewire stack), registration removed |
 | Roles | `spatie/laravel-permission` — global `admin` / `employee` |
 | Real time | Reverb + Echo |
+| Calls | WebRTC, peer-to-peer; Cloudflare Realtime TURN for relay |
 | Queues | Redis + Horizon |
 | Search | Scout, database driver (MySQL `FULLTEXT` on `messages.body`) |
 | Push | `laravel-notification-channels/webpush` |
@@ -142,8 +322,22 @@ For real-time delivery you also need, in separate terminals:
 ```bash
 php artisan reverb:start     # WebSocket server
 php artisan queue:work       # or `php artisan horizon` on Redis
-php artisan schedule:work    # drives the emergency escalation sweep
+php artisan schedule:work    # drives the emergency and huddle sweeps
 ```
+
+Room huddles additionally need a LiveKit SFU. It is optional: leave `LIVEKIT_*`
+blank and the huddle button is simply not rendered, so a fresh clone still runs
+with no extra servers. To work on huddles:
+
+```bash
+livekit-server --config deploy/livekit/livekit.local.yaml
+```
+
+Do **not** use `livekit-server --dev`. It signs with the hard-coded six-byte
+secret `secret`, and HS256 needs 256 bits of key — `firebase/php-jwt` refuses to
+sign with anything shorter. The policy checks the length and fails closed, so the
+symptom is a huddle button that never appears. `--dev` also sends no webhooks, so
+the join banner would never update either way.
 
 Without `reverb:start` the app still works, but nothing is live: messages need a
 refresh and emergency overlays never appear. This is the single most common
@@ -167,14 +361,34 @@ Seeded users have `must_change_password` cleared so you can sign straight in.
 Accounts created through the admin console do not, and are held on the rotation
 screen until they set their own.
 
+The full list, with a test script for the paths that need two people, is in
+[`docs/test-accounts.xlsx`](docs/test-accounts.xlsx). Regenerate it after
+re-seeding — it is built from the database, not from the seeder source, so it
+cannot claim an account that is not there:
+
+```bash
+php artisan hub:export-test-accounts
+```
+
+It carries seed credentials only. **No infrastructure secrets belong in it** —
+the database password, Cloudflare TURN token, VAPID private key and Reverb app
+secret live in `.env`, which is gitignored so they cannot be committed. That
+workbook is not.
+
 ---
 
 ## Testing
 
 ```bash
-php artisan test                       # Pest: 185 tests
+php artisan test                       # Pest: 293 tests
 php artisan test --filter=Security     # the authorisation matrix
+npm run test:js                        # node: 62 tests, no browser needed
 ```
+
+`npm run test:js` is where the call state machine lives. Eight states, six
+timeouts, and the case where both people dial at the same instant — none of it
+observable in a browser test without two machines and a lot of patience, so
+`resources/js/call-machine.js` is a pure function and is checked in node.
 
 The suite runs on in-memory SQLite. Full-text search degrades to `LIKE` there;
 the MySQL `FULLTEXT` path is exercised by the browser suite.
@@ -203,19 +417,34 @@ Configs live in [`deploy/`](deploy/) and assume `/var/www/oaktree-hub`:
 | File | Purpose |
 |---|---|
 | `deploy/nginx/oaktree-hub.conf` | TLS, security headers, and the WebSocket proxy |
+| `deploy/nginx/oaktree-rtc.conf` | TLS for the LiveKit SFU on its own hostname |
+| `deploy/php/oaktree-uploads.ini` | upload ceilings — **required**, or attachments cap at 2 MB |
 | `deploy/supervisor/oaktree-horizon.conf` | keeps Horizon alive |
 | `deploy/supervisor/oaktree-reverb.conf` | keeps Reverb alive |
+| `deploy/supervisor/oaktree-livekit.conf` | keeps the huddle SFU alive |
+| `deploy/livekit/livekit.yaml` | SFU config — **contains a secret**, template only in the repo |
+| `deploy/livekit/install-livekit.sh` | pinned SFU install/upgrade, run by hand |
 | `deploy/cron/oaktree-scheduler` | the one cron line the scheduler needs |
 | `deploy/deploy.sh` | ordered release script |
 
-Three things are easy to get wrong:
+Five things are easy to get wrong:
 
 1. **`horizon:terminate` must run after the new code is in place.** Workers hold
    the old code in memory until they cycle.
 2. **Reverb is tier 1.** If it is down the hub looks fine and silently stops
    being real time. Alert on the process, not just on nginx and PHP-FPM.
-3. **The scheduler cron is what backstops escalation.** Without it, an
-   escalation lost to a worker restart is never retried.
+3. **The scheduler cron is what backstops escalation** — and now huddle state
+   too. Without it, an escalation lost to a worker restart is never retried, a
+   lost LiveKit webhook leaves a permanent "Huddle in progress" banner, and a
+   suspended employee stays in a live huddle indefinitely, because once somebody
+   is inside one there is no next request for the middleware to act on.
+4. **Restarting LiveKit ends every huddle in progress.** Huddle media flows
+   through that process, unlike one-to-one call media, so there is no drain that
+   helps. It is deliberately outside `deploy.sh` — upgrade it out of hours.
+5. **The huddle VM needs dedicated cores.** On a shared-core `e2-medium`,
+   sustained packet forwarding burns the CPU credit and the machine is throttled
+   — which presents as the huddle going choppy and the whole site slowing at the
+   same moment, and is miserable to diagnose. `n2-standard-4` or better.
 
 ### Queues
 
@@ -289,6 +518,14 @@ first. **Attachments are what actually grow**: they live in object storage, not
 the database, and at two 1 MB files per person per day they run to roughly
 700 GB a year, some 300× the message text. That is the number to budget.
 
+**The 40 MB ceiling changes which number to watch.** Those figures assume 1 MB
+files; the limit is now forty times that, so the thing that scales is not
+storage but **egress**. Object storage is roughly $0.02/GB/month and GCP egress
+is roughly $0.12/GB, so a single 40 MB attachment costs a fraction of a cent to
+keep and about half a cent every time somebody opens it. One file read by twenty
+colleagues is ~$0.10 — trivial once, and the dominant line item if large files
+become how people share work. Watch download volume, not bucket size.
+
 Read receipts are the reason the message table stays this small. Storing one
 receipt per person per message would add about **10 GB every year** at normal
 usage. The per-member read cursor used instead (see §1 of `docs/PLAN.md`) is
@@ -348,6 +585,19 @@ else in the app are unaffected.
   run as unproven.
 - Real-time delivery is verified server-side and by feature tests, but no one has
   yet watched two browsers exchange a message live.
+- **No call has been placed between two real browsers.** The authorisation, Do
+  Not Disturb and state-machine paths are covered by tests, and the bundle
+  builds, but the media path is unproven. In particular, **every test in the
+  suite passes with a completely broken TURN configuration** — the only way to
+  find out whether relay works is to force `iceTransportPolicy: 'relay'` and
+  place a call between two different networks. Do that before trusting calls in
+  production.
+- Call behaviour on iOS Safari is untested. The remote `<audio>` element is
+  started from the Accept tap because that is the user gesture iOS requires;
+  if that is wrong the failure mode is silent one-way audio, not an error.
+- A deploy ends calls that are ringing or connecting. Calls already connected
+  survive, because their media does not pass through this server. There is
+  deliberately no drain step — see the comment in `deploy/deploy.sh`.
 - Per-room muting is unbuilt. `room_members.is_muted` exists and is read nowhere;
   it is the natural home for it.
 - No mention detection (`@name`), so notifications cannot be narrowed to "only

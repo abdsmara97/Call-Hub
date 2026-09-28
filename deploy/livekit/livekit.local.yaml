@@ -1,0 +1,53 @@
+# LiveKit for LOCAL DEVELOPMENT ONLY.
+#
+#   livekit-server --config deploy/livekit/livekit.local.yaml
+#
+# Use this rather than `livekit-server --dev`, for two independent reasons:
+#
+#  1. --dev signs with the hard-coded secret "secret", which is six bytes.
+#     HS256 requires 256 bits of key and firebase/php-jwt refuses anything
+#     shorter, so App\Services\HuddleTokens cannot mint a token against a --dev
+#     server at all. RoomPolicy::huddle() checks the length and answers "no", so
+#     the symptom is a huddle button that is simply absent.
+#  2. --dev sends no webhooks, so the "Call in progress" banner never appears or
+#     clears and the whole of App\Services\HuddleRegistry goes unexercised.
+#
+# The key below is a throwaway committed on purpose: it is long enough to sign
+# with, obviously fake, and this file is never installed on a server. Production
+# is deploy/livekit/livekit.yaml, whose secret is blank in the repository and
+# filled in only at /etc/livekit/livekit.yaml.
+#
+# NEVER copy this file to a server.
+
+port: 7880
+
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  # Two browsers on one machine connect over host candidates, so no external
+  # address discovery is needed or wanted here.
+  use_external_ip: false
+
+room:
+  # Matches production: only the app may create a room, so a stale join token
+  # cannot resurrect an empty huddle and put a phantom banner in front of you.
+  auto_create: false
+  empty_timeout: 60
+  departure_timeout: 20
+
+keys:
+  oaktree-local: oaktree-local-development-only-not-a-real-secret
+
+webhook:
+  api_key: oaktree-local
+  urls:
+    # `php artisan serve` default. If you run the app on another port, change it
+    # here too — a webhook that 404s is silent, and the symptom is a banner that
+    # never updates.
+    - http://127.0.0.1:8000/api/webhooks/livekit
+
+turn:
+  enabled: false
+
+logging:
+  level: debug

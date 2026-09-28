@@ -99,7 +99,7 @@ it('renders a plain message without adding whitespace', function () {
 
     $segments = $message->fresh()->bodySegments();
 
-    expect($segments)->toBe([['type' => 'text', 'text' => $body, 'user_id' => null]]);
+    expect($segments)->toBe([['type' => 'text', 'text' => $body, 'url' => null, 'user_id' => null]]);
 
     // And the rendered element holds the body with no whitespace padded around
     // it. Livewire's morph markers are HTML comments and render as nothing, so
@@ -131,6 +131,84 @@ it('drops a mention row that no longer fits the body rather than slicing garbage
 
     expect(collect($segments)->pluck('text')->implode(''))->toBe('hi')
         ->and(collect($segments)->where('type', 'mention'))->toBeEmpty();
+});
+
+/*
+ * Links. Same rule as mentions: the anchor is literal template text and only
+ * the href and the label come from the body, so the escaping property holds.
+ */
+it('makes a pasted link clickable', function () {
+    $this->messages->send($this->them, $this->room, 'watch https://www.youtube.com/watch?v=dQw4w9WgXcQ tonight');
+
+    $html = renderRoom();
+
+    expect($html)->toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"')
+        ->and($html)->toContain('rel="noopener noreferrer nofollow ugc"');
+});
+
+it('gives a bare www address a scheme', function () {
+    $message = $this->messages->send($this->them, $this->room, 'see www.youtube.com/watch?v=abc');
+
+    $segments = collect($message->fresh()->bodySegments())->where('type', 'link')->values();
+
+    expect($segments)->toHaveCount(1)
+        ->and($segments[0]['url'])->toBe('https://www.youtube.com/watch?v=abc')
+        ->and($segments[0]['text'])->toBe('www.youtube.com/watch?v=abc');
+});
+
+/*
+ * The decisive case for links. Escaping a `javascript:` address produces a
+ * perfectly escaped attribute that still runs, so the scheme is filtered rather
+ * than escaped — the body below has to come out as text.
+ */
+it('never turns a javascript or data address into a link', function () {
+    $body = 'try javascript:alert(1) or data:text/html;base64,PHNjcmlwdD4=';
+
+    $message = $this->messages->send($this->them, $this->room, $body);
+
+    $segments = $message->fresh()->bodySegments();
+
+    expect(collect($segments)->where('type', 'link'))->toBeEmpty()
+        ->and(renderRoom())->not->toContain('href="javascript:');
+});
+
+it('leaves the punctuation that ended the sentence out of the link', function () {
+    $message = $this->messages->send($this->them, $this->room, 'here (https://youtu.be/abc), and https://example.com.');
+
+    $links = collect($message->fresh()->bodySegments())->where('type', 'link')->pluck('url')->values();
+
+    expect($links->all())->toBe(['https://youtu.be/abc', 'https://example.com']);
+});
+
+it('keeps a bracket the link itself opened', function () {
+    $message = $this->messages->send($this->them, $this->room, 'https://en.wikipedia.org/wiki/Bay_(disambiguation) here');
+
+    $links = collect($message->fresh()->bodySegments())->where('type', 'link')->pluck('url')->values();
+
+    expect($links->all())->toBe(['https://en.wikipedia.org/wiki/Bay_(disambiguation)']);
+});
+
+it('rebuilds the exact body from segments containing both a mention and a link', function () {
+    $body = "@Me Myself see https://youtu.be/abc 🚧\nsecond line";
+
+    $message = $this->messages->send($this->them, $this->room, $body);
+
+    $rebuilt = collect($message->fresh()->load('mentions')->bodySegments())
+        ->pluck('text')
+        ->implode('');
+
+    expect($rebuilt)->toBe($body);
+});
+
+it('does not linkify a mention that looks like an address', function () {
+    $this->them->forceFill(['name' => 'www.example.com'])->save();
+
+    $message = $this->messages->send($this->them, $this->room, 'ping @www.example.com now');
+
+    $segments = $message->fresh()->load('mentions')->bodySegments();
+
+    expect(collect($segments)->where('type', 'link'))->toBeEmpty()
+        ->and(collect($segments)->where('type', 'mention')->pluck('text')->first())->toBe('@www.example.com');
 });
 
 it('highlights a mention inside a thread reply', function () {

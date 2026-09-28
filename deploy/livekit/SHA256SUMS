@@ -1,0 +1,13 @@
+# Checksum for the release named in VERSION, so install-livekit.sh refuses
+# anything it did not expect. Update this in the SAME commit that changes
+# VERSION, or the install will fail closed — which is the intent.
+#
+# Get the value for a release with:
+#   V=$(cat deploy/livekit/VERSION)
+#   curl -fsSL "https://github.com/livekit/livekit/releases/download/${V}/livekit_${V#v}_linux_amd64.tar.gz" \
+#     | sha256sum
+#
+# Then replace the line below, keeping the two-space separator that sha256sum -c
+# expects.
+
+430f011a587d267418230346d65f9a46e1e538c906faf40ad9bd2f7582a4fa1d  livekit_1.9.1_linux_amd64.tar.gz

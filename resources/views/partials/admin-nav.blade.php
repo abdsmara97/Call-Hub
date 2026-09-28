@@ -6,6 +6,7 @@
     $adminLinks = [
         ['route' => 'admin.users', 'label' => 'Users', 'icon' => 'users'],
         ['route' => 'admin.import', 'label' => 'Import', 'icon' => 'upload'],
+        ['route' => 'admin.forms', 'label' => 'Forms', 'icon' => 'document'],
         ['route' => 'admin.emergency-log', 'label' => 'Emergency log', 'icon' => 'alert'],
         ['route' => 'admin.misuse', 'label' => 'Misuse', 'icon' => 'chart'],
         ['route' => 'admin.settings', 'label' => 'Settings', 'icon' => 'cog'],
@@ -15,7 +16,9 @@
 
 <nav class="mb-6 flex flex-wrap items-center gap-1 border-b border-line pb-3" aria-label="Administration">
     @foreach ($adminLinks as $link)
-        @php $isActive = request()->routeIs($link['route']); @endphp
+        {{-- Also matches sub-pages, so "Forms" stays lit on the builder and the
+             responses screen rather than leaving no tab selected. --}}
+        @php $isActive = request()->routeIs($link['route']) || request()->routeIs($link['route'].'.*'); @endphp
 
         <a href="{{ route($link['route']) }}"
            class="{{ $isActive ? 'nav-item-active' : 'nav-item' }}"

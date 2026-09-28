@@ -36,6 +36,52 @@
         </div>
 
         <div class="flex items-center gap-1">
+            {{--
+                Calling is one-to-one and direct-message-only, so these appear
+                nowhere else. @can is the display half of that rule; RoomPolicy
+                is the half that actually enforces it — a hidden button is a
+                suggestion, not a control.
+            --}}
+            @can('call', $room)
+                @php
+                    $callDetail = [
+                        'roomId' => $room->getKey(),
+                        'peerId' => $other?->getKey(),
+                        'peerName' => $other?->name,
+                        'peerAvatar' => $other?->avatar_url,
+                    ];
+                @endphp
+
+                <button type="button" class="btn-ghost !px-2 !py-1.5"
+                        aria-label="Call {{ $other?->name }}" title="Call"
+                        x-data
+                        @click="$dispatch('call-dial', @js($callDetail))">
+                    <x-icon name="phone" class="h-4 w-4" />
+                </button>
+
+                <button type="button" class="btn-ghost !px-2 !py-1.5"
+                        aria-label="Video call {{ $other?->name }}" title="Video call"
+                        x-data
+                        @click="$dispatch('call-dial', @js($callDetail + ['video' => true]))">
+                    <x-icon name="video" class="h-4 w-4" />
+                </button>
+            @endcan
+
+            {{--
+                Starting a huddle. Unlike the call buttons above this appears in
+                every room, including the company-wide ones — a huddle goes
+                through the SFU and has none of the mesh's limits. It rings
+                nobody: it puts a banner in the room and waits.
+            --}}
+            @can('huddle', $room)
+                <button type="button" class="btn-ghost !px-2 !py-1.5"
+                        aria-label="Start a huddle in this room" title="Start a huddle"
+                        x-data
+                        @click="$dispatch('huddle-start', { roomId: {{ $room->getKey() }} })">
+                    <x-icon name="microphone" class="h-4 w-4" />
+                </button>
+            @endcan
+
             <div class="relative hidden sm:block">
                 <label for="conversation-search" class="sr-only">Search this conversation</label>
                 <x-icon name="search" class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" />
@@ -54,6 +100,16 @@
             @endcan
         </div>
     </header>
+
+    {{--
+        Directly under the header, above the pinned block. Putting it below the
+        pinned emergencies would bury it; putting it above them would rank a
+        huddle over an emergency, which is wrong. "What is happening in this room
+        right now" belongs here.
+    --}}
+    @can('huddle', $room)
+        @include('livewire.hub.partials.huddle-banner')
+    @endcan
 
     {{-- ------------------------------------------ pinned emergencies + notes --}}
     @if ($this->pinnedEmergencies->isNotEmpty() || $this->pinnedMessages->isNotEmpty())
@@ -153,6 +209,66 @@
                 </div>
             @endif
 
+            {{-- Form picker. Sits above the message box for the same reason the
+                 poll composer does: opening it must not cost a half-written
+                 message. There is no builder here — forms are written in the
+                 admin area, and this only decides which one this room gets. --}}
+            @if ($formPickerOpen)
+                <div class="mb-2 rounded-md border border-line bg-surface-sunken p-3">
+                    <div class="flex items-center gap-2">
+                        <x-icon name="document" class="h-4 w-4 text-content-subtle" />
+                        <h2 class="flex-1 text-sm font-semibold">Send a form</h2>
+                        <a href="{{ route('admin.forms.create') }}" wire:navigate
+                           class="btn-ghost !px-1.5 !py-1 !text-2xs">
+                            <x-icon name="plus" class="h-3.5 w-3.5" />
+                            Write a new one
+                        </a>
+                        <button type="button" wire:click="closeFormPicker"
+                                class="btn-ghost !px-1.5 !py-1" aria-label="Close the form picker">
+                            <x-icon name="x" class="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <x-input-error :messages="$errors->get('form')" class="mt-2" />
+
+                    @if ($this->sendableForms->isEmpty())
+                        <p class="mt-2 text-xs text-content-muted">
+                            Nothing to send. Every open form has already been sent here, or none has
+                            been written yet —
+                            <a href="{{ route('admin.forms') }}" wire:navigate
+                               class="font-medium text-brand-text hover:underline">manage forms</a>.
+                        </p>
+                    @else
+                        <ul class="mt-2 max-h-64 space-y-1.5 overflow-y-auto" role="list">
+                            @foreach ($this->sendableForms as $sendable)
+                                <li wire:key="sendable-{{ $sendable->id }}">
+                                    <button type="button" wire:click="sendForm({{ $sendable->id }})"
+                                            class="flex w-full items-center gap-2 rounded-md border border-line
+                                                   bg-surface px-2.5 py-2 text-left hover:border-brand-border">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium">{{ $sendable->title }}</p>
+                                            <p class="text-2xs text-content-subtle">
+                                                {{ $sendable->fields_count }}
+                                                {{ Str::plural('question', $sendable->fields_count) }}
+                                                @if ($sendable->closes_at)
+                                                    · closes {{ $sendable->closes_at->diffForHumans() }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <x-icon name="send" class="h-4 w-4 shrink-0 text-content-subtle" />
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        <p class="mt-2 text-2xs text-content-subtle">
+                            Everyone here will be asked to fill it in. Answers are recorded against
+                            their names and only you and other administrators can read them.
+                        </p>
+                    @endif
+                </div>
+            @endif
+
             {{-- Poll composer. Replaces nothing — it sits above the message box
                  so a half-written message is never lost to opening it. --}}
             @if ($pollOpen)
@@ -234,7 +350,9 @@
                 {{-- The '@' autocomplete wraps the textarea. Enter is shared:
                      while the list is open it picks a name, and only otherwise
                      does it send — guarding on state beats racing two handlers
-                     on the same element. --}}
+                     on the same element. Ctrl+Enter and Cmd+Enter send too, and
+                     go through the same guard, so the list still gets first
+                     claim on the key however you reach for it. --}}
                 <div class="relative" x-data="mentionAutocomplete(@js($this->mentionCandidates))">
                     <label for="composer" class="sr-only">Message {{ $room->displayNameFor($me) }}</label>
                     <textarea id="composer" wire:model="body" rows="2" x-ref="composer"
@@ -249,6 +367,8 @@
                               x-on:keydown.escape="open && (($event.stopPropagation()), close())"
                               x-on:keydown.tab="open && (($event.preventDefault()), choose())"
                               @keydown.enter.exact="$event.preventDefault(); open ? choose() : ($wire.send(), stop())"
+                              @keydown.enter.ctrl.prevent="open ? choose() : ($wire.send(), stop())"
+                              @keydown.enter.meta.prevent="open ? choose() : ($wire.send(), stop())"
                               x-bind:aria-expanded="open ? 'true' : 'false'"
                               aria-autocomplete="list"
                               class="field resize-y text-base
@@ -319,6 +439,17 @@
                             <x-icon name="chart" class="h-4 w-4" />
                             <span class="sr-only">Create a poll</span>
                         </button>
+
+                        {{-- Forms are written in the admin area, never here. This
+                             only chooses one to put in front of this room. --}}
+                        @can('postIn', [App\Models\Form::class, $room])
+                            <button type="button" wire:click="openFormPicker"
+                                    class="btn-ghost !px-2" title="Send a form"
+                                    aria-expanded="{{ $formPickerOpen ? 'true' : 'false' }}">
+                                <x-icon name="document" class="h-4 w-4" />
+                                <span class="sr-only">Send a form</span>
+                            </button>
+                        @endcan
                     @endunless
 
                     {{-- The emergency control is deliberately separate from Send. --}}
@@ -333,6 +464,7 @@
 
                     <button type="submit"
                             class="{{ $emergencyArmed ? 'btn-emergency' : 'btn-primary' }} ml-auto"
+                            title="Enter or Ctrl+Enter to send, Shift+Enter for a new line"
                             wire:loading.attr="disabled" wire:target="send">
                         <x-icon name="send" class="h-4 w-4" />
                         {{ $emergencyArmed ? 'Send emergency' : 'Send' }}
