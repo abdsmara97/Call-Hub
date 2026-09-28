@@ -1,0 +1,51 @@
+==============================================================
+ SAAI (ساعي) — LOCAL LOGIN CHEAT SHEET
+==============================================================
+Everything below is SEEDED DEMO DATA for local development.
+Change every one of these before any public deployment.
+
+--------------------------------------------------------------
+ 1. PLATFORM PANEL  (create & manage workspaces/tenants)
+--------------------------------------------------------------
+ URL:       http://127.0.0.1:8000/platform/login
+ Email:     operator@saai.app
+ Password:  password
+
+ - Separate login & session from the hub. A hub account can NOT
+   open this panel, and this account can NOT open the hub.
+ - Creating a workspace shows its admin's temporary password
+   EXACTLY ONCE - copy it before dismissing.
+ - Add another operator (console only, no UI on purpose):
+   php artisan tinker --execute="App\Models\PlatformAdmin::create(['name' => 'Name', 'email' => 'x@y.com', 'password' => 'their-password']);"
+
+--------------------------------------------------------------
+ 2. HUB — WORKSPACE ADMIN  (users, invitations, billing, alerts)
+--------------------------------------------------------------
+ URL:       http://127.0.0.1:8000/login
+ Email:     pm@oaktreetech.com
+ Password:  password
+
+--------------------------------------------------------------
+ 3. HUB — DEMO STAFF  (regular employees)
+--------------------------------------------------------------
+ URL:       http://127.0.0.1:8000/login
+ Password:  password        (same for all seeded accounts)
+ Emails:    firstname.lastname@oaktreetech.com, e.g.
+            amina.haddad@oaktreetech.com     (Head of Engineering)
+            daniel.okoye@oaktreetech.com     (Senior Backend Engineer)
+            rosa.delgado@oaktreetech.com     (Fleet Operations Director)
+            mei.chen@oaktreetech.com         (Warehouse Manager)
+            yusuf.karim@oaktreetech.com      (SUSPENDED - for testing)
+
+ Full list with roles/departments: run
+   php artisan hub:export-test-accounts
+ which writes docs/test-accounts.xlsx from the live database.
+
+--------------------------------------------------------------
+ 4. LOCAL DEV SERVERS
+--------------------------------------------------------------
+ App:     php artisan serve          -> http://127.0.0.1:8000
+ Assets:  npm run dev                (Vite, port 5173)
+ Realtime: php artisan reverb:start  (WebSockets, port 8085)
+ Queues:  php artisan queue:work     (emergencies, imports)
+==============================================================
