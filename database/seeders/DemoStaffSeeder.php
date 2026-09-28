@@ -82,10 +82,6 @@ class DemoStaffSeeder extends Seeder
             Permissions::ROLE_ADMIN,
         );
 
-        // The platform operator: the one account that can create workspaces.
-        // forceFill because is_super_admin is deliberately not mass-assignable.
-        $admin->forceFill(['is_super_admin' => true])->save();
-
         $staff = collect([$admin]);
 
         foreach (self::STAFF as $index => [$name, $title, $companySlug, $administrationSlug]) {

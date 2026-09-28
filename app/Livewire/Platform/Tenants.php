@@ -4,18 +4,16 @@ namespace App\Livewire\Platform;
 
 use App\Models\Tenant;
 use App\Services\WorkspaceProvisioner;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 /**
  * The platform operator's panel: every workspace on the installation, and
- * the only place a new one can be created. Deliberately not part of the
- * tenant admin area — a tenant admin runs their workspace; this screen
- * runs the platform.
+ * the only place a new one can be created. Lives behind its own guard and
+ * layout — an operator is signed into the panel, not into any workspace.
  */
-#[Layout('layouts.app')]
+#[Layout('layouts.platform')]
 class Tenants extends Component
 {
     use WithPagination;
@@ -33,12 +31,14 @@ class Tenants extends Component
 
     public function mount(): void
     {
-        Gate::authorize('manage-platform');
+        abort_unless(auth('platform')->check(), 403);
     }
 
     public function create(WorkspaceProvisioner $workspaces): void
     {
-        Gate::authorize('manage-platform');
+        // Re-checked here, not just in mount: Livewire actions arrive on
+        // their own requests and must not outlive the operator's session.
+        abort_unless(auth('platform')->check(), 403);
 
         $input = $this->validate([
             'workspace' => ['required', 'string', 'min:2', 'max:80'],
@@ -68,8 +68,9 @@ class Tenants extends Component
     {
         return view('livewire.platform.tenants', [
             'tenants' => Tenant::query()
-                // The operator's own request is tenant-bound like any other;
-                // the count has to look across the fence on purpose.
+                // An operator has no tenant, so nothing is bound — but the
+                // count still bypasses the scope explicitly, so it stays
+                // correct even if this ever renders inside a bound context.
                 ->withCount(['users' => fn ($q) => $q->withoutGlobalScope('tenant')])
                 ->orderBy('name')
                 ->paginate(25),

@@ -5,7 +5,8 @@ messages, and an emergency alert system that reaches people wherever they are in
 the app — including when the tab is in the background.
 
 Multi-tenant: each customer gets a **workspace** (a tenant), created by the
-platform operator from the platform panel (`Platform → Workspaces`), and
+platform operator from a separate panel with its own login and credentials
+(`/platform/login`, `platform_admins` table — not a hub account), and
 organises it into companies and administrations — sized for roughly 1,000
 accounts per workspace. There is no public signup. Staff accounts are never
 self-created either: they exist only because a workspace administrator
@@ -453,9 +454,9 @@ Five things are easy to get wrong:
 
 **One stack serves every customer.** A single Reverb cluster, a single LiveKit
 deployment, one Horizon/queue fleet and one database carry all tenants; a new
-customer is a row created by the platform operator (`Platform → Workspaces`),
-never a new VM, database, or process. Nothing in `deploy/` is duplicated per
-customer.
+customer is a row created by the platform operator (from `/platform/tenants`,
+behind its own login), never a new VM, database, or process. Nothing in
+`deploy/` is duplicated per customer.
 
 Isolation is carried in the names and the schema, not in separate
 infrastructure:

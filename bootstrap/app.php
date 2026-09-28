@@ -43,6 +43,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);
+
+        // Each guard has its own front door: operators are never bounced to
+        // the hub login, and hub users never see the platform one.
+        $middleware->redirectGuestsTo(fn ($request) => $request->routeIs('platform.*')
+            ? route('platform.login')
+            : route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

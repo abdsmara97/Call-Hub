@@ -20,7 +20,12 @@ class EnsurePasswordIsRotated
 
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        /*
+         * Explicitly the web guard: these rules police hub accounts. On a
+         * platform-guard request $request->user() would be the operator,
+         * who has none of these lifecycle rules.
+         */
+        $user = $request->user('web');
 
         if ($user && $user->must_change_password && ! $request->routeIs(self::ALLOWED)) {
             // Livewire's XHRs must be redirected too, or the user would sit on a

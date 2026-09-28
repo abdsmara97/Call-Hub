@@ -23,6 +23,7 @@ use App\Livewire\Admin\UserImport;
 use App\Livewire\Admin\UserManager;
 use App\Livewire\Auth\AcceptInvitation;
 use App\Livewire\Auth\RotatePassword;
+use App\Livewire\Platform\Login as PlatformLogin;
 use App\Livewire\Platform\Tenants;
 use App\Livewire\Directory;
 use App\Livewire\Hub\FormFill;
@@ -125,13 +126,28 @@ Route::middleware('auth')->group(function () {
         Route::get('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
     });
 
-    /*
-     * The platform panel — the operator's own area, above every tenant.
-     * Gated by the manage-platform gate (users.is_super_admin), which no
-     * import or admin form can grant.
-     */
-    Route::prefix('platform')->name('platform.')->middleware('can:manage-platform')->group(function () {
+});
+
+/*
+ * The platform panel — the operator's own area, above every tenant, with
+ * its own guard and its own front door. A hub session grants nothing here
+ * and an operator session grants nothing in the hub.
+ */
+Route::prefix('platform')->name('platform.')->group(function () {
+    Route::middleware('guest:platform')->group(function () {
+        Route::get('login', PlatformLogin::class)->name('login');
+    });
+
+    Route::middleware('auth:platform')->group(function () {
         Route::get('tenants', Tenants::class)->name('tenants');
+
+        Route::post('logout', function () {
+            auth('platform')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            return redirect()->route('platform.login');
+        })->name('logout');
     });
 });
 

@@ -14,7 +14,12 @@ class TrackPresence
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        /*
+         * Explicitly the web guard: these rules police hub accounts. On a
+         * platform-guard request $request->user() would be the operator,
+         * who has none of these lifecycle rules.
+         */
+        $user = $request->user('web');
 
         if ($user && (! $user->last_seen_at || $user->last_seen_at->diffInSeconds(now()) > 60)) {
             $user->forceFill(['last_seen_at' => now()])->saveQuietly();

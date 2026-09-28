@@ -16,7 +16,10 @@ class SetTenantContext
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        // Explicitly the web guard: only hub accounts carry a tenant. A
+        // platform operator's requests run unbound — the panel looks across
+        // every tenant on purpose.
+        $user = $request->user('web');
 
         if ($user && $user->tenant_id !== null) {
             app(TenantContext::class)->set($user->tenant_id);
