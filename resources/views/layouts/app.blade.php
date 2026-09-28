@@ -7,6 +7,10 @@
     <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
     <title>{{ $title ?? config('app.name') }}</title>
 
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+
     {{--
         Theme is resolved before first paint so a dark-mode user never sees a
         white flash. Runs inline, ahead of the stylesheet, on purpose.
