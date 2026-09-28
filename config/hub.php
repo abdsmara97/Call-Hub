@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Oak Tree Venture Hub — product configuration.
+ * Saai — product configuration.
  *
  * Values here are install-time defaults. Anything an administrator is allowed to
  * change at runtime is mirrored into the `settings` table (see App\Models\Setting)

@@ -371,7 +371,7 @@
                          },
                          enable() {
                              this.busy = true;
-                             Promise.resolve(window.OakTreeHub?.enablePush?.())
+                             Promise.resolve(window.Saai?.enablePush?.())
                                  .catch(() => {})
                                  .finally(() => { this.busy = false; this.refresh(); });
                          },

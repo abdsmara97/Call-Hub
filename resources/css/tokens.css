@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Oak Tree Venture Hub — Design Tokens
+   Saai — Design Tokens
    --------------------------------------------------------------------------
    Colours are stored as space-separated RGB channels so Tailwind can apply
    opacity modifiers: rgb(var(--color-brand) / <alpha-value>).
@@ -13,18 +13,18 @@
 :root {
   /* ---------------------------------------------------------------- ramps */
 
-  /* Oak green — brand. Base 500 = #439735 (hsl 111 48% 40%). */
-  --oak-50: 241 249 239;
-  --oak-100: 221 240 216;
-  --oak-200: 188 226 179;
-  --oak-300: 147 208 134;
-  --oak-400: 107 185 92;
-  --oak-500: 67 151 53;   /* #439735 — brand base */
-  --oak-600: 58 138 45;   /* hover on light */
-  --oak-700: 46 122 34;   /* #2E7A22 — 5.35:1 on white, safe for body text */
-  --oak-800: 39 95 30;
-  --oak-900: 32 79 26;
-  --oak-950: 14 43 11;
+  /* Saai blue — brand, sampled from the logo mark. Base 500 = #2B8AF3. */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 142 195 253;
+  --brand-400: 90 160 250;
+  --brand-500: 43 138 243;   /* #2B8AF3 — brand base, sampled from the logo's plane */
+  --brand-600: 30 110 214;   /* hover on light */
+  --brand-700: 21 82 176;    /* #1552B0 — ~7.3:1 on white, safe for body text */
+  --brand-800: 13 58 136;
+  --brand-900: 5 38 96;      /* #052660 — sampled from the logo's navy wordmark */
+  --brand-950: 3 22 58;
 
   /* Crimson — emergency only. Never used for anything non-urgent. */
   --alert-50: 254 242 242;
@@ -81,15 +81,15 @@
   --color-text-subtle: var(--slate-500);
   --color-text-inverse: var(--slate-0);
 
-  --color-brand: var(--oak-500);
-  --color-brand-hover: var(--oak-600);
-  --color-brand-active: var(--oak-700);
-  --color-brand-disabled: var(--oak-200);
-  --color-brand-text: var(--oak-700);       /* brand-coloured *text* (AA safe) */
-  --color-brand-tint: var(--oak-50);        /* subtle brand-washed background */
-  --color-brand-tint-strong: var(--oak-100);
-  --color-brand-border: var(--oak-300);
-  --color-on-brand: var(--slate-0);         /* text on a solid brand fill */
+  --color-brand: var(--brand-500);
+  --color-brand-hover: var(--brand-600);
+  --color-brand-active: var(--brand-700);
+  --color-brand-disabled: var(--brand-200);
+  --color-brand-text: var(--brand-700);       /* brand-coloured *text* (AA safe) */
+  --color-brand-tint: var(--brand-50);        /* subtle brand-washed background */
+  --color-brand-tint-strong: var(--brand-100);
+  --color-brand-border: var(--brand-300);
+  --color-on-brand: var(--slate-0);           /* text on a solid brand fill */
 
   --color-emergency: var(--alert-600);
   --color-emergency-hover: var(--alert-700);
@@ -105,15 +105,15 @@
   --color-warning-tint: 254 249 231;
   --color-info: var(--sky-600);
   --color-info-tint: 236 248 255;
-  --color-success: var(--oak-600);
+  --color-success: var(--brand-600);
 
   /* Presence */
-  --color-presence-available: var(--oak-500);
+  --color-presence-available: var(--brand-500);
   --color-presence-busy: var(--alert-500);
   --color-presence-away: var(--amber-500);
   --color-presence-off-shift: var(--slate-400);
 
-  --color-focus: var(--oak-600);
+  --color-focus: var(--brand-600);
 
   /* ------------------------------------------------------------ type scale */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -205,15 +205,15 @@
   --color-text-subtle: var(--slate-500);
   --color-text-inverse: var(--slate-950);
 
-  /* On dark surfaces the mid-green reads brighter, so the ramp shifts up. */
-  --color-brand: var(--oak-400);
-  --color-brand-hover: var(--oak-300);
-  --color-brand-active: var(--oak-200);
-  --color-brand-disabled: var(--oak-900);
-  --color-brand-text: var(--oak-300);       /* 7:1+ on slate-900 */
-  --color-brand-tint: 22 38 19;
-  --color-brand-tint-strong: 30 52 25;
-  --color-brand-border: var(--oak-800);
+  /* On dark surfaces the mid-blue reads brighter, so the ramp shifts up. */
+  --color-brand: var(--brand-400);
+  --color-brand-hover: var(--brand-300);
+  --color-brand-active: var(--brand-200);
+  --color-brand-disabled: var(--brand-900);
+  --color-brand-text: var(--brand-300);       /* 7:1+ on slate-900 */
+  --color-brand-tint: 12 22 42;
+  --color-brand-tint-strong: 18 32 58;
+  --color-brand-border: var(--brand-800);
   --color-on-brand: var(--slate-950);
 
   --color-emergency: var(--alert-500);
@@ -230,14 +230,14 @@
   --color-warning-tint: 48 36 8;
   --color-info: var(--sky-400);
   --color-info-tint: 8 34 48;
-  --color-success: var(--oak-400);
+  --color-success: var(--brand-400);
 
-  --color-presence-available: var(--oak-400);
+  --color-presence-available: var(--brand-400);
   --color-presence-busy: var(--alert-400);
   --color-presence-away: var(--amber-400);
   --color-presence-off-shift: var(--slate-500);
 
-  --color-focus: var(--oak-300);
+  --color-focus: var(--brand-300);
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);

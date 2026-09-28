@@ -6,20 +6,16 @@
 <header class="z-sticky shrink-0 border-b border-line bg-surface">
     <div class="flex h-14 items-center gap-3 px-3 sm:px-4">
         {{--
-            The Oak Tree Ventures wordmark. It carries the company name itself, so
-            there is no text beside it — the link's accessible name comes from
-            aria-label instead, which also keeps it stable at every breakpoint.
-
-            The asset has a white background (it is a JPEG, so no alpha), hence
-            the white chip: invisible against the light surface, and a deliberate
-            badge rather than a stray white rectangle in dark mode.
+            The logo is a JPEG-derived PNG with a white background (no alpha),
+            hence the white chip: invisible against the light surface, and a
+            deliberate badge rather than a stray white rectangle in dark mode.
         --}}
         <a href="{{ route('hub') }}"
            class="flex shrink-0 items-center rounded-sm px-1 py-1"
-           aria-label="Oak Tree Venture Hub — go to messages">
-            <img src="{{ asset('images/logo.png') }}" alt=""
-                 width="187" height="53"
-                 class="h-8 w-auto rounded bg-white p-0.5">
+           aria-label="{{ config('app.name') }} — go to messages">
+            <img src="{{ asset('images/logo-compact.png') }}" alt=""
+                 width="1020" height="420"
+                 class="h-9 w-auto rounded bg-white p-0.5">
         </a>
 
         @auth
