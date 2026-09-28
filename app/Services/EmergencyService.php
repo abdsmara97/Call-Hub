@@ -150,6 +150,9 @@ class EmergencyService
     private function record(User $sender, string $body, array $attributes): Emergency
     {
         return Emergency::create(array_merge([
+            // Inherited from the sender, not the request context, so the
+            // audit row lands in the right tenant even from a job or test.
+            'tenant_id' => $sender->tenant_id,
             'sender_id' => $sender->getKey(),
             'body' => trim($body),
             // Snapshotted so a later settings change cannot rewrite history.

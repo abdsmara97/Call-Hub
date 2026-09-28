@@ -20,6 +20,8 @@ class AdministrationFactory extends Factory
 
         return [
             'company_id' => Company::factory(),
+            'tenant_id' => fn (array $attributes) => Company::withoutGlobalScopes()
+                ->find($attributes['company_id'])?->tenant_id,
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(4)),
         ];

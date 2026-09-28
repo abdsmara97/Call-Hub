@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
-    protected $fillable = ['key', 'value'];
+    use BelongsToTenant;
+
+    protected $fillable = ['tenant_id', 'key', 'value'];
 
     protected function casts(): array
     {
@@ -16,14 +20,24 @@ class Setting extends Model
 
     protected static function booted(): void
     {
-        static::saved(fn (Setting $setting) => Cache::forget(self::cacheKey($setting->key)));
-        static::deleted(fn (Setting $setting) => Cache::forget(self::cacheKey($setting->key)));
+        // A write flushes both the row's tenant slot and the unbound-context
+        // slot: console reads cache under 'global' while the row itself
+        // belongs to a tenant, and a stale entry in either is a wrong answer.
+        $flush = function (Setting $setting): void {
+            Cache::forget(self::cacheKey($setting->key, $setting->tenant_id));
+            Cache::forget(self::cacheKey($setting->key, null));
+        };
+
+        static::saved($flush);
+        static::deleted($flush);
     }
 
     /** Falls back to config('hub.*') so a fresh install works before seeding. */
     public static function get(string $key, mixed $default = null): mixed
     {
-        return Cache::rememberForever(self::cacheKey($key), function () use ($key, $default) {
+        $tenantId = app(TenantContext::class)->id();
+
+        return Cache::rememberForever(self::cacheKey($key, $tenantId), function () use ($key, $default) {
             $row = static::query()->where('key', $key)->first();
 
             return $row ? $row->value['value'] ?? $default : $default;
@@ -35,8 +49,12 @@ class Setting extends Model
         static::updateOrCreate(['key' => $key], ['value' => ['value' => $value]]);
     }
 
-    private static function cacheKey(string $key): string
+    /**
+     * Settings are per-tenant rows now, so the cache entry carries the tenant
+     * id; an unbound context (console, seeders) gets its own slot.
+     */
+    private static function cacheKey(string $key, ?int $tenantId): string
     {
-        return "setting:{$key}";
+        return 'setting:'.($tenantId ?? 'global').":{$key}";
     }
 }

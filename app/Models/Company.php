@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,9 +10,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Company extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
-    protected $fillable = ['name', 'slug'];
+    protected $fillable = ['tenant_id', 'name', 'slug'];
 
     public function administrations(): HasMany
     {

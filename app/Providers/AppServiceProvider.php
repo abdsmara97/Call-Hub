@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +15,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /*
+         * The tenant boundary for the current request or job. Scoped, not a
+         * plain singleton, so long-lived workers reset it between requests
+         * instead of leaking one tenant's context into the next.
+         */
+        $this->app->scoped(TenantContext::class);
     }
 
     /**

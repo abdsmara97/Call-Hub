@@ -3,11 +3,25 @@
 namespace Database\Seeders;
 
 use App\Models\Setting;
+use App\Models\Tenant;
+use App\Support\TenantContext;
 use Illuminate\Database\Seeder;
 
 class SettingsSeeder extends Seeder
 {
     public function run(): void
+    {
+        // Settings are per-tenant rows; seed them for the default tenant so a
+        // fresh install's admin screen shows saved values, not just fallbacks.
+        $tenant = Tenant::firstOrCreate(
+            ['slug' => 'default'],
+            ['name' => config('app.name')],
+        );
+
+        app(TenantContext::class)->runAs($tenant, fn () => $this->seedDefaults());
+    }
+
+    private function seedDefaults(): void
     {
         $defaults = [
             'emergency.escalation_interval_minutes' => config('hub.emergency.escalation_interval_minutes'),

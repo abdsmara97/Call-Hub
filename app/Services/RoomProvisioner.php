@@ -27,6 +27,7 @@ class RoomProvisioner
                 'is_system' => true,
             ],
             [
+                'tenant_id' => $company->tenant_id,
                 'name' => $company->name,
                 'slug' => 'co-'.$company->slug,
                 'topic' => 'Everyone at '.$company->name,
@@ -45,6 +46,7 @@ class RoomProvisioner
                 'is_system' => true,
             ],
             [
+                'tenant_id' => $administration->tenant_id,
                 'company_id' => $administration->company_id,
                 'name' => $administration->name,
                 'slug' => 'ad-'.$administration->company->slug.'-'.$administration->slug,
@@ -107,8 +109,9 @@ class RoomProvisioner
     {
         return DB::transaction(function () use ($creator, $name, $type, $topic) {
             $room = Room::create([
+                'tenant_id' => $creator->tenant_id,
                 'name' => $name,
-                'slug' => $this->uniqueSlug($name),
+                'slug' => $this->uniqueSlug($name, $creator->tenant_id),
                 'topic' => $topic,
                 'type' => $type->value,
                 'created_by' => $creator->getKey(),
@@ -149,6 +152,7 @@ class RoomProvisioner
             $ids = collect([$a->getKey(), $b->getKey()])->sort()->values();
 
             $room = Room::create([
+                'tenant_id' => $a->tenant_id,
                 'name' => null,
                 'slug' => 'dm-'.$ids->implode('-'),
                 'type' => RoomType::Dm->value,
@@ -161,13 +165,15 @@ class RoomProvisioner
         });
     }
 
-    private function uniqueSlug(string $name): string
+    private function uniqueSlug(string $name, ?int $tenantId): string
     {
         $base = Str::slug($name) ?: 'room';
         $slug = $base;
         $suffix = 2;
 
-        while (Room::query()->where('slug', $slug)->exists()) {
+        // Slugs are unique per tenant, so the collision check has to look at
+        // the owning tenant's rooms regardless of what context is bound.
+        while (Room::acrossTenants()->where('tenant_id', $tenantId)->where('slug', $slug)->exists()) {
             $slug = $base.'-'.$suffix++;
         }
 

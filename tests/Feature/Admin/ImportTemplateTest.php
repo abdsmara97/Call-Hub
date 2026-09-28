@@ -139,7 +139,7 @@ it('downloads the template as a csv attachment', function () {
 
     expect($response->headers->get('Content-Disposition'))
         ->toContain('attachment')
-        ->toContain('oak-tree-employee-import-template.csv');
+        ->toContain('saai-employee-import-template.csv');
 });
 
 it('opens cleanly in excel by leading with a utf-8 marker', function () {

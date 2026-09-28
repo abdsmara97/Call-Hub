@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\RoomType;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -16,6 +17,8 @@ class RoomFactory extends Factory
         $name = fake()->unique()->words(2, true);
 
         return [
+            // Join the graph's existing tenant — see CompanyFactory.
+            'tenant_id' => fn () => Tenant::query()->value('id') ?? Tenant::factory(),
             'name' => Str::title($name),
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(4)),
             'topic' => fake()->sentence(),
