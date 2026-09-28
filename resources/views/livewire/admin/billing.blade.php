@@ -7,7 +7,7 @@
 
         @unless ($enforced)
             <div class="mb-4 flex items-start gap-2 rounded-lg border border-line bg-info-tint px-3 py-2 text-sm text-info">
-                <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0" />
+                <x-icon name="check-circle" class="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
                     Billing is not enforced on this install. Every feature, including the
                     emergency system, is available without a subscription.

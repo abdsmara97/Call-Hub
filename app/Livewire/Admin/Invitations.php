@@ -60,8 +60,14 @@ class Invitations extends Component
         ]);
 
         // Re-inviting replaces the previous token instead of stacking one.
+        // The tenant is part of the match and set explicitly — inherited from
+        // the inviter, not the request context, so the row lands in the right
+        // tenant even where no context is bound.
         $invitation = Invitation::updateOrCreate(
-            ['email' => Str::lower(trim($this->email))],
+            [
+                'tenant_id' => auth()->user()->tenant_id,
+                'email' => Str::lower(trim($this->email)),
+            ],
             [
                 'token' => Invitation::generateToken(),
                 'role' => $this->role,
