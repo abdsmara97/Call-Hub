@@ -1,4 +1,5 @@
 {
+    "name": "saai",
     "private": true,
     "type": "module",
     "scripts": {

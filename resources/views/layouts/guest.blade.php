@@ -20,15 +20,14 @@
     @livewireStyles
 </head>
 <body class="h-full bg-canvas text-content">
-    <div class="flex min-h-full flex-col items-center justify-center px-4 py-10">
+    <div class="relative flex min-h-full flex-col items-center justify-center overflow-hidden px-4 py-10">
+        <img src="{{ asset('images/login-background.jpg') }}" alt=""
+             class="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-50">
+
         <div class="mb-6 flex flex-col items-center gap-3">
-            <img src="{{ asset('images/logo.png') }}" alt=""
-                 width="187" height="53"
-                 class="h-12 w-auto rounded-lg bg-white p-1.5">
-            <div class="text-center">
-                <h1 class="text-lg font-semibold tracking-tight">Oak Tree Venture Hub</h1>
-                <p class="text-xs text-content-muted">Internal communications</p>
-            </div>
+            <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}"
+                 width="1020" height="520"
+                 class="h-20 w-auto rounded-lg bg-white p-2 shadow-sm">
         </div>
 
         <div class="w-full max-w-sm panel p-6">

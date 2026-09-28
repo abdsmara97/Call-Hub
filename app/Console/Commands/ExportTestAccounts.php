@@ -33,13 +33,13 @@ class ExportTestAccounts extends Command
 
     protected $description = 'Export the seeded demo accounts and a two-person test script to an Excel workbook';
 
-    private const BRAND = 'FF1F6F4A';
+    private const BRAND = 'FF0D3A88';
 
     private const HEADER_TEXT = 'FFFFFFFF';
 
-    private const ZEBRA = 'FFF4F7F5';
+    private const ZEBRA = 'FFEFF6FF';
 
-    private const GRID = 'FFD8E0DA';
+    private const GRID = 'FFD9E3F5';
 
     private const WARN_FILL = 'FFFEF2F2';
 
@@ -57,8 +57,8 @@ class ExportTestAccounts extends Command
 
         $book = new Spreadsheet;
         $book->getProperties()
-            ->setCreator('Oak Tree Venture Hub')
-            ->setTitle('Oak Tree Venture Hub — seeded test accounts')
+            ->setCreator('Saai')
+            ->setTitle('Saai — seeded test accounts')
             ->setDescription('Sign-in details for the seeded demo accounts. Local and demo use only.');
 
         $this->buildAccounts($book->getActiveSheet(), $users);
@@ -190,7 +190,7 @@ class ExportTestAccounts extends Command
         $admin = $users->first(fn (User $u) => $u->roles->pluck('name')->contains('admin'));
         $suspended = $users->filter(fn (User $u) => $u->status->value !== 'active')->count();
 
-        $sheet->setCellValue('A1', 'Oak Tree Venture Hub — seeded test accounts');
+        $sheet->setCellValue('A1', 'Saai — seeded test accounts');
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15)->getColor()->setARGB(self::BRAND);
 
         $lines = [

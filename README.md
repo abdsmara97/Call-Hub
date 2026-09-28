@@ -1,6 +1,6 @@
-# Oak Tree Venture Hub
+# Saai
 
-An internal communication hub for Oak Tree Technology: team messaging, direct
+An internal communication hub for Saai: team messaging, direct
 messages, and an emergency alert system that reaches people wherever they are in
 the app — including when the tab is in the background.
 

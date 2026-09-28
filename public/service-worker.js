@@ -1,5 +1,5 @@
 /**
- * Push handler for Oak Tree Venture Hub.
+ * Push handler for Saai.
  *
  * Deliberately minimal: no offline caching, no asset interception. Its only job
  * is to surface an emergency notification when the tab is closed or in the

@@ -26,8 +26,8 @@ class EmployeeImportTemplateController extends Controller
         $csv = EmployeeImport::sampleCsv(withExamples: ! $blank);
 
         $filename = $blank
-            ? 'oak-tree-employee-import-blank.csv'
-            : 'oak-tree-employee-import-template.csv';
+            ? 'saai-employee-import-blank.csv'
+            : 'saai-employee-import-template.csv';
 
         // A BOM, so Excel opens the file as UTF-8 instead of mangling any
         // non-ASCII name in the roster.

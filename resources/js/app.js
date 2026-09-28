@@ -15,7 +15,7 @@ import {
 import { enablePush, pushPermission } from './push';
 
 // Exposed for the profile screen's notification buttons.
-window.OakTreeHub = {
+window.Saai = {
     enablePush,
     pushPermission,
     requestNotificationPermission,
