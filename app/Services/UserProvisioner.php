@@ -25,7 +25,13 @@ class UserProvisioner
         $password = $temporaryPassword ?: $this->temporaryPassword();
 
         $user = DB::transaction(function () use ($attributes, $password) {
+            // The tenant comes from the company the account is placed in, so
+            // unbound contexts (seeders, console imports) land correctly too.
+            $tenantId = $attributes['tenant_id']
+                ?? \App\Models\Company::acrossTenants()->whereKey($attributes['company_id'])->value('tenant_id');
+
             $user = User::create([
+                'tenant_id' => $tenantId,
                 'name' => $attributes['name'],
                 'email' => Str::lower(trim($attributes['email'])),
                 'phone' => $attributes['phone'] ?? null,

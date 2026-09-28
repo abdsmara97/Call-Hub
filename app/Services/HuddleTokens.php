@@ -64,7 +64,10 @@ class HuddleTokens
      */
     public function roomNameFor(Room $room): string
     {
-        return $this->prefix().$room->getKey();
+        // The tenant segment keeps one shared LiveKit deployment safe for
+        // every customer: names cannot collide across tenants, and the
+        // webhook can verify the mapping is internally consistent.
+        return $this->prefix().$room->tenant_id.'-'.$room->getKey();
     }
 
     /**
@@ -73,6 +76,11 @@ class HuddleTokens
      * Returns null rather than throwing for anything unrecognised. A webhook
      * naming a room we cannot map is answered with 200 and dropped, because a
      * 4xx makes LiveKit retry it forever.
+     *
+     * The tenant fence: a name claiming an existing room under the wrong
+     * tenant is treated as unrecognised. A room that no longer exists still
+     * maps — the name is in our namespace, and the deleted-room case is
+     * handled deliberately downstream (reconcile tears the huddle down).
      */
     public function roomIdFrom(string $name): ?int
     {
@@ -82,9 +90,17 @@ class HuddleTokens
             return null;
         }
 
-        $id = substr($name, strlen($prefix));
+        $parts = explode('-', substr($name, strlen($prefix)));
 
-        return ctype_digit($id) ? (int) $id : null;
+        if (count($parts) !== 2 || ! ctype_digit($parts[0]) || ! ctype_digit($parts[1])) {
+            return null;
+        }
+
+        [$tenantId, $roomId] = [(int) $parts[0], (int) $parts[1]];
+
+        $actualTenant = Room::acrossTenants()->whereKey($roomId)->value('tenant_id');
+
+        return ($actualTenant === null || $actualTenant === $tenantId) ? $roomId : null;
     }
 
     /** The websocket URL handed to the browser at join time, never bundled. */

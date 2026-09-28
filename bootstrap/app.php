@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\EnsurePasswordIsRotated;
 use App\Http\Middleware\SanitiseSocketId;
+use App\Http\Middleware\SetTenantContext;
 use App\Http\Middleware\TrackPresence;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,9 +29,11 @@ return Application::configure(basePath: dirname(__DIR__))
             SanitiseSocketId::class,
         ]);
 
-        // Order matters: a suspended account is ejected before anything else
-        // runs, and a temporary password blocks every screen but the rotation.
+        // Order matters: the tenant boundary binds before anything reads data,
+        // a suspended account is ejected before anything else runs, and a
+        // temporary password blocks every screen but the rotation.
         $middleware->appendToGroup('web', [
+            SetTenantContext::class,
             EnsureAccountIsActive::class,
             EnsurePasswordIsRotated::class,
             TrackPresence::class,

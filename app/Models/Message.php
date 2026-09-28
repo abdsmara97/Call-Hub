@@ -320,20 +320,34 @@ class Message extends Model
     // ------------------------------------------------------------------ scout
 
     /**
-     * Only the body is indexed. Access control is applied at query time by
-     * intersecting hits with the rooms the searcher belongs to — never trust
-     * the index itself to enforce authorisation.
+     * The body plus the tenant fence. Access control is still applied at
+     * query time by intersecting hits with the rooms the searcher belongs
+     * to — never trust the index itself to enforce authorisation — but the
+     * tenant_id in the payload lets every search be cut to one customer
+     * before that intersection happens.
      */
     public function toSearchableArray(): array
     {
         return [
             'id' => $this->getKey(),
             'body' => (string) $this->body,
+            'tenant_id' => $this->room?->tenant_id,
+            'room_id' => $this->room_id,
         ];
     }
 
     public function shouldBeSearchable(): bool
     {
         return filled($this->body);
+    }
+
+    /**
+     * The only sanctioned way to full-text search messages: the tenant
+     * filter is part of the call signature, not something a caller can
+     * forget. One shared index, hard-fenced per customer.
+     */
+    public static function searchInTenant(int $tenantId, string $term): \Laravel\Scout\Builder
+    {
+        return static::search($term)->where('tenant_id', $tenantId);
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 /**
  * Fires on every vote, retraction and close, so a room watching a poll sees the
@@ -22,7 +23,7 @@ class PollUpdated implements ShouldBroadcastNow
     /** @return array<int, PrivateChannel> */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('room.'.$this->poll->room_id)];
+        return [new PrivateChannel(BroadcastChannels::roomId($this->poll->room_id))];
     }
 
     public function broadcastAs(): string

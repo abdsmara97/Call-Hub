@@ -49,6 +49,9 @@ class FormService
 
         $form = DB::transaction(function () use ($author, $title, $description, $fields, $closesAt) {
             $form = Form::create([
+                // Inherited from the author, not the request context, so the
+                // form lands in the right tenant even from a job or test.
+                'tenant_id' => $author->tenant_id,
                 'created_by' => $author->getKey(),
                 'title' => $title,
                 'description' => $description,

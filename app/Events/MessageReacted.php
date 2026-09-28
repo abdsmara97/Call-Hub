@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 /**
  * A reaction was added or removed, so everyone watching the room sees the count
@@ -24,7 +25,7 @@ class MessageReacted implements ShouldBroadcastNow
     /** @return array<int, PrivateChannel> */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('room.'.$this->roomId)];
+        return [new PrivateChannel(BroadcastChannels::roomId($this->roomId))];
     }
 
     public function broadcastAs(): string

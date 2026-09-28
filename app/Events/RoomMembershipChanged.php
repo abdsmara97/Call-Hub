@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 class RoomMembershipChanged implements ShouldBroadcastNow
 {
@@ -22,7 +23,7 @@ class RoomMembershipChanged implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return array_merge(
-            [new PrivateChannel('room.'.$this->roomId)],
+            [new PrivateChannel(BroadcastChannels::roomId($this->roomId))],
             array_map(
                 fn (int $id) => new PrivateChannel('App.Models.User.'.$id),
                 $this->affectedUserIds,

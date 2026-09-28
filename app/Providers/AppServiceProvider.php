@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +15,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /*
+         * The tenant boundary for the current request or job. Scoped, not a
+         * plain singleton, so long-lived workers reset it between requests
+         * instead of leaking one tenant's context into the next.
+         */
+        $this->app->scoped(TenantContext::class);
+
+        // The paying customer is the Tenant, not an individual User.
+        \Laravel\Cashier\Cashier::useCustomerModel(\App\Models\Tenant::class);
     }
 
     /**
@@ -22,6 +31,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * The platform panel. Not a spatie permission on purpose: tenant
+         * admins manage their workspace, the platform operator manages
+         * workspaces themselves, and the flag is deliberately outside
+         * $fillable so no import or form can ever grant it.
+         */
+        \Illuminate\Support\Facades\Gate::define(
+            'manage-platform',
+            fn (\App\Models\User $user) => $user->is_super_admin
+        );
+
         /*
          * Call signalling and TURN credential minting.
          *

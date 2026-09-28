@@ -48,7 +48,7 @@ beforeEach(function () {
     app(RoomProvisioner::class)->addMember($this->room, $this->alice);
     app(RoomProvisioner::class)->addMember($this->room, $this->bob);
 
-    $this->roomName = 'hub-room-'.$this->room->getKey();
+    $this->roomName = 'hub-room-'.$this->room->tenant_id.'-'.$this->room->getKey();
 
     // Mutable fakes: Http::fake() merges rather than replaces, so tests steer
     // these arrays instead of re-faking.
@@ -218,7 +218,7 @@ it('ends a huddle whose room has been deleted', function () {
 
     $this->artisan('huddles:reconcile')->assertSuccessful();
 
-    expect($this->deleted)->toContain('hub-room-'.$roomId);
+    expect($this->deleted)->toContain($this->roomName);
 });
 
 it('ignores livekit rooms that belong to something else', function () {

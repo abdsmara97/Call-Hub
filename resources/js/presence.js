@@ -21,8 +21,13 @@
 /** roomId => number of live holders */
 const holders = new Map();
 
+/** See room-channel.js — the tenant segment fences customers apart. */
+function tenantId() {
+    return document.querySelector('meta[name="tenant-id"]')?.content ?? '';
+}
+
 function channelName(roomId) {
-    return `presence.room.${roomId}`;
+    return `tenant.${tenantId()}.presence.room.${roomId}`;
 }
 
 /**

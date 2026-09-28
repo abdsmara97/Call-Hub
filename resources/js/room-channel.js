@@ -18,8 +18,16 @@
 /** roomId => number of live holders */
 const holders = new Map();
 
+/**
+ * Channel names carry the tenant so one shared Reverb cluster serves every
+ * customer. The layout stamps the signed-in user's tenant into a meta tag.
+ */
+function tenantId() {
+    return document.querySelector('meta[name="tenant-id"]')?.content ?? '';
+}
+
 function channelName(roomId) {
-    return `room.${roomId}`;
+    return `tenant.${tenantId()}.room.${roomId}`;
 }
 
 export function joinRoomChannel(roomId) {

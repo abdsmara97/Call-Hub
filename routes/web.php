@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CallCredentialController;
 use App\Http\Controllers\CallSignalController;
 use App\Http\Controllers\EmergencyLogExportController;
@@ -9,16 +10,20 @@ use App\Http\Controllers\FormAnswerFileController;
 use App\Http\Controllers\HuddleTokenController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\StartDirectMessageController;
+use App\Livewire\Admin\Billing;
 use App\Livewire\Admin\EmergencyBroadcast;
 use App\Livewire\Admin\EmergencyLog;
 use App\Livewire\Admin\FormBuilder;
 use App\Livewire\Admin\FormManager;
 use App\Livewire\Admin\FormResponses;
 use App\Livewire\Admin\HubSettings;
+use App\Livewire\Admin\Invitations;
 use App\Livewire\Admin\MisuseReport;
 use App\Livewire\Admin\UserImport;
 use App\Livewire\Admin\UserManager;
+use App\Livewire\Auth\AcceptInvitation;
 use App\Livewire\Auth\RotatePassword;
+use App\Livewire\Platform\Tenants;
 use App\Livewire\Directory;
 use App\Livewire\Hub\FormFill;
 use App\Livewire\Hub\Workspace;
@@ -28,6 +33,16 @@ use App\Livewire\SavedMessages;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/hub');
+
+/*
+ * The invitation link is how staff join a workspace. A guest route on
+ * purpose — the token, not a session, is what authorises an acceptance.
+ * There is deliberately no public workspace signup: workspaces are created
+ * only by the platform operator, from the platform panel below.
+ */
+Route::middleware('guest')->group(function () {
+    Route::get('invitations/{token}', AcceptInvitation::class)->name('invitations.accept');
+});
 
 Route::middleware('auth')->group(function () {
     // Reachable while `must_change_password` is set; everything else is not.
@@ -89,6 +104,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('users', UserManager::class)->name('users');
+        Route::get('users/invitations', Invitations::class)->name('invitations');
         Route::get('users/import', UserImport::class)->name('import');
         Route::get('users/import/template', EmployeeImportTemplateController::class)
             ->name('import.template');
@@ -103,6 +119,19 @@ Route::middleware('auth')->group(function () {
         Route::get('emergency-log/export', EmergencyLogExportController::class)->name('emergency-log.export');
         Route::get('misuse', MisuseReport::class)->name('misuse');
         Route::get('settings', HubSettings::class)->name('settings');
+
+        Route::get('billing', Billing::class)->name('billing');
+        Route::get('billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
+        Route::get('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
+    });
+
+    /*
+     * The platform panel — the operator's own area, above every tenant.
+     * Gated by the manage-platform gate (users.is_super_admin), which no
+     * import or admin form can grant.
+     */
+    Route::prefix('platform')->name('platform.')->middleware('can:manage-platform')->group(function () {
+        Route::get('tenants', Tenants::class)->name('tenants');
     });
 });
 

@@ -32,8 +32,10 @@ class UserFactory extends Factory
             // Every employee belongs to an administration, and the company is
             // whatever that administration sits under — never an unrelated one.
             'administration_id' => Administration::factory(),
-            'company_id' => fn (array $attributes) => Administration::find($attributes['administration_id'])?->company_id
+            'company_id' => fn (array $attributes) => Administration::withoutGlobalScopes()->find($attributes['administration_id'])?->company_id
                 ?? Company::factory(),
+            'tenant_id' => fn (array $attributes) => Company::withoutGlobalScopes()
+                ->find($attributes['company_id'])?->tenant_id,
             'job_title' => fake()->jobTitle(),
             'status' => UserStatus::Active->value,
             'availability' => Availability::Available->value,
@@ -61,6 +63,7 @@ class UserFactory extends Factory
     public function inAdministration(Administration $administration): static
     {
         return $this->state(fn (array $attributes) => [
+            'tenant_id' => $administration->tenant_id,
             'company_id' => $administration->company_id,
             'administration_id' => $administration->getKey(),
         ]);

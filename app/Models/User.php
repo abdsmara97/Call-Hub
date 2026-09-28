@@ -6,6 +6,7 @@ use App\Enums\Availability;
 use App\Enums\MessageNotificationLevel;
 use App\Enums\RoomMemberRole;
 use App\Enums\UserStatus;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,9 +21,10 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasPushSubscriptions, HasRoles, Notifiable;
+    use BelongsToTenant, HasFactory, HasPushSubscriptions, HasRoles, Notifiable;
 
     protected $fillable = [
+        'tenant_id',
         'name',
         'email',
         'password',
@@ -51,6 +53,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'is_super_admin' => 'boolean',
             'message_notifications' => MessageNotificationLevel::class,
             'status' => UserStatus::class,
             'availability' => Availability::class,

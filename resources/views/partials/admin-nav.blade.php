@@ -5,11 +5,13 @@
      */
     $adminLinks = [
         ['route' => 'admin.users', 'label' => 'Users', 'icon' => 'users'],
+        ['route' => 'admin.invitations', 'label' => 'Invitations', 'icon' => 'at-symbol'],
         ['route' => 'admin.import', 'label' => 'Import', 'icon' => 'upload'],
         ['route' => 'admin.forms', 'label' => 'Forms', 'icon' => 'document'],
         ['route' => 'admin.emergency-log', 'label' => 'Emergency log', 'icon' => 'alert'],
         ['route' => 'admin.misuse', 'label' => 'Misuse', 'icon' => 'chart'],
         ['route' => 'admin.settings', 'label' => 'Settings', 'icon' => 'cog'],
+        ['route' => 'admin.billing', 'label' => 'Billing', 'icon' => 'chart'],
         ['route' => 'admin.broadcast', 'label' => 'Broadcast', 'icon' => 'megaphone'],
     ];
 @endphp

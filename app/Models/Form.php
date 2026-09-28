@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -15,7 +16,9 @@ use Illuminate\Support\Collection;
  */
 class Form extends Model
 {
-    protected $fillable = ['created_by', 'title', 'description', 'closes_at'];
+    use BelongsToTenant;
+
+    protected $fillable = ['tenant_id', 'created_by', 'title', 'description', 'closes_at'];
 
     protected function casts(): array
     {

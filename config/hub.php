@@ -187,4 +187,21 @@ return [
          */
         'room_prefix' => env('HUB_HUDDLE_ROOM_PREFIX', 'hub-room-'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Billing
+    |--------------------------------------------------------------------------
+    |
+    | Seats are the core subscription; the emergency system is the priced
+    | add-on. `enforced` is the master switch: while it is off (development,
+    | tests, the grandfathered single-tenant install) every feature behaves
+    | as if fully paid. Turning it on without Stripe keys locks the add-on
+    | for everyone — deliberately loud rather than silently free.
+    */
+    'billing' => [
+        'enforced' => (bool) env('HUB_BILLING_ENFORCED', false),
+        'seat_price_id' => env('STRIPE_SEAT_PRICE_ID'),
+        'emergency_price_id' => env('STRIPE_EMERGENCY_PRICE_ID'),
+    ],
 ];

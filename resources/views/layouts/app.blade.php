@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
+    @auth
+        {{-- Broadcast channel names carry the tenant; the JS reads it here. --}}
+        <meta name="tenant-id" content="{{ auth()->user()->tenant_id }}">
+    @endauth
     <title>{{ $title ?? config('app.name') }}</title>
+
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 
     {{--
         Theme is resolved before first paint so a dark-mode user never sees a

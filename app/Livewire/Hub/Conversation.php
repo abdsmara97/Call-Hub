@@ -75,19 +75,19 @@ class Conversation extends Component
 
     protected function getListeners(): array
     {
-        $room = $this->roomId;
+        $channel = "tenant.".auth()->user()->tenant_id.".room.{$this->roomId}";
 
         return [
-            "echo-private:room.{$room},.message.sent" => 'onIncomingMessage',
-            "echo-private:room.{$room},.message.updated" => '$refresh',
-            "echo-private:room.{$room},.message.deleted" => '$refresh',
-            "echo-private:room.{$room},.read.updated" => '$refresh',
-            "echo-private:room.{$room},.emergency.sent" => '$refresh',
-            "echo-private:room.{$room},.emergency.acknowledged" => '$refresh',
-            "echo-private:room.{$room},.emergency.resolved" => '$refresh',
-            "echo-private:room.{$room},.poll.updated" => 'refreshTimeline',
-            "echo-private:room.{$room},.form.updated" => 'refreshTimeline',
-            "echo-private:room.{$room},.message.reacted" => 'refreshTimeline',
+            "echo-private:{$channel},.message.sent" => 'onIncomingMessage',
+            "echo-private:{$channel},.message.updated" => '$refresh',
+            "echo-private:{$channel},.message.deleted" => '$refresh',
+            "echo-private:{$channel},.read.updated" => '$refresh',
+            "echo-private:{$channel},.emergency.sent" => '$refresh',
+            "echo-private:{$channel},.emergency.acknowledged" => '$refresh',
+            "echo-private:{$channel},.emergency.resolved" => '$refresh',
+            "echo-private:{$channel},.poll.updated" => 'refreshTimeline',
+            "echo-private:{$channel},.form.updated" => 'refreshTimeline',
+            "echo-private:{$channel},.message.reacted" => 'refreshTimeline',
             'emergency-acknowledged' => '$refresh',
         ];
     }
