@@ -11,21 +11,25 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Self-serve workspace creation: one signup produces a Tenant, its first
- * Company and Administration, and the admin account that owns them — all or
- * nothing. The org chart starts minimal ("General"); the admin reshapes it
- * from the console afterwards.
+ * Workspace creation, done only from the platform panel: one call produces
+ * a Tenant, its first Company and Administration, and the admin account
+ * that owns them — all or nothing. The admin gets a temporary password and
+ * a forced rotation, the same doctrine every other issued account follows.
+ * The org chart starts minimal ("General"); the admin reshapes it from
+ * their own console afterwards.
  */
 class WorkspaceProvisioner
 {
     public function __construct(
         private readonly RoomProvisioner $rooms,
+        private readonly UserProvisioner $users,
     ) {}
 
     /**
-     * @param  array{workspace: string, name: string, email: string, password: string}  $input
+     * @param  array{workspace: string, name: string, email: string}  $input
+     * @return array{0: Tenant, 1: User, 2: string} tenant, admin, and their temporary password
      */
-    public function create(array $input): User
+    public function create(array $input): array
     {
         return DB::transaction(function () use ($input) {
             $tenant = Tenant::create([
@@ -46,23 +50,17 @@ class WorkspaceProvisioner
                     'slug' => 'general',
                 ]);
 
-                $user = User::create([
+                [$admin, $temporaryPassword] = $this->users->create([
                     'tenant_id' => $tenant->getKey(),
                     'name' => $input['name'],
-                    'email' => Str::lower(trim($input['email'])),
-                    'password' => $input['password'],
+                    'email' => $input['email'],
                     'company_id' => $company->getKey(),
                     'administration_id' => $administration->getKey(),
                     'job_title' => 'Workspace Administrator',
-                    'must_change_password' => false,
-                    'email_verified_at' => now(),
+                    'role' => Permissions::ROLE_ADMIN,
                 ]);
 
-                $user->syncRoles([Permissions::ROLE_ADMIN]);
-
-                $this->rooms->syncSystemRoomsFor($user);
-
-                return $user;
+                return [$tenant, $admin, $temporaryPassword];
             });
         });
     }

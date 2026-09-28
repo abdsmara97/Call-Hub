@@ -69,6 +69,13 @@
                         <span class="hidden sm:inline">Admin</span>
                     </a>
                 @endcan
+
+                @can('manage-platform')
+                    <a href="{{ route('platform.tenants') }}" class="{{ $navLink(request()->routeIs('platform.*')) }}">
+                        <x-icon name="lock" class="h-4 w-4" />
+                        <span class="hidden sm:inline">Platform</span>
+                    </a>
+                @endcan
             </nav>
 
             <div class="ml-auto flex items-center gap-1">

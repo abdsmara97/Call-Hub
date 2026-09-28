@@ -32,6 +32,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         /*
+         * The platform panel. Not a spatie permission on purpose: tenant
+         * admins manage their workspace, the platform operator manages
+         * workspaces themselves, and the flag is deliberately outside
+         * $fillable so no import or form can ever grant it.
+         */
+        \Illuminate\Support\Facades\Gate::define(
+            'manage-platform',
+            fn (\App\Models\User $user) => $user->is_super_admin
+        );
+
+        /*
          * Call signalling and TURN credential minting.
          *
          * Unlike the emergency limiter this is not product doctrine and is not

@@ -4,11 +4,12 @@ An internal communication hub for Saai: team messaging, direct
 messages, and an emergency alert system that reaches people wherever they are in
 the app — including when the tab is in the background.
 
-Multi-tenant: each customer signs up for a **workspace** (a tenant) at
-`/signup` and organises it into companies and administrations — sized for
-roughly 1,000 accounts per workspace. Staff accounts are never self-created:
-they exist only because a workspace administrator invited (`Admin →
-Invitations`), created, or imported them.
+Multi-tenant: each customer gets a **workspace** (a tenant), created by the
+platform operator from the platform panel (`Platform → Workspaces`), and
+organises it into companies and administrations — sized for roughly 1,000
+accounts per workspace. There is no public signup. Staff accounts are never
+self-created either: they exist only because a workspace administrator
+invited (`Admin → Invitations`), created, or imported them.
 
 ---
 
@@ -281,7 +282,7 @@ notifications**.
 |---|---|
 | Framework | Laravel 12 on PHP 8.2 |
 | UI | Livewire 3 + Volt, Blade, Tailwind, Vite |
-| Auth | Breeze (Livewire stack); workspace signup + invitations, no open staff registration |
+| Auth | Breeze (Livewire stack); operator-created workspaces + email invitations, no public registration of any kind |
 | Roles | `spatie/laravel-permission` — global `admin` / `employee` |
 | Real time | Reverb + Echo |
 | Calls | WebRTC, peer-to-peer; Cloudflare Realtime TURN for relay |
@@ -452,8 +453,9 @@ Five things are easy to get wrong:
 
 **One stack serves every customer.** A single Reverb cluster, a single LiveKit
 deployment, one Horizon/queue fleet and one database carry all tenants; a new
-customer is a row created by signup at `/signup`, never a new VM, database, or
-process. Nothing in `deploy/` is duplicated per customer.
+customer is a row created by the platform operator (`Platform → Workspaces`),
+never a new VM, database, or process. Nothing in `deploy/` is duplicated per
+customer.
 
 Isolation is carried in the names and the schema, not in separate
 infrastructure:

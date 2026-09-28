@@ -53,6 +53,7 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'is_super_admin' => 'boolean',
             'message_notifications' => MessageNotificationLevel::class,
             'status' => UserStatus::class,
             'availability' => Availability::class,

@@ -36,9 +36,12 @@ through a room or user, both of which are fenced.
   `huddles:reconcile` can tear the orphaned LiveKit room down.
 - **Scout.** The message payload carries `tenant_id`;
   `Message::searchInTenant()` makes the fence part of the call signature.
-- **Onboarding.** `/signup` → `WorkspaceProvisioner` creates tenant +
-  company + "General" administration + admin atomically. Admins invite by
-  email (`admin/users/invitations`); accepting the token creates the
+- **Onboarding.** Workspaces are created only by the platform operator
+  (`platform/tenants`, gated on `users.is_super_admin`, which is never
+  mass-assignable): `WorkspaceProvisioner` creates tenant + company +
+  "General" administration + admin atomically, issuing the admin a
+  temporary password with forced rotation. Workspace admins invite staff
+  by email (`admin/users/invitations`); accepting the token creates the
   account. CSV import unchanged, as the bulk path.
 - **Billing.** Cashier with **Tenant as the customer**. Seats = the
   `default` subscription (quantity = accounts); the emergency system is the
