@@ -60,8 +60,10 @@ it('listens to every room the user belongs to', function () {
 
     $listeners = array_keys($method->invoke($component->instance()));
 
-    expect($listeners)->toContain("echo-private:room.{$this->room->id},.message.sent")
-        ->and($listeners)->toContain("echo-private:room.{$second->id},.message.sent");
+    $tenant = $this->me->tenant_id;
+
+    expect($listeners)->toContain("echo-private:tenant.{$tenant}.room.{$this->room->id},.message.sent")
+        ->and($listeners)->toContain("echo-private:tenant.{$tenant}.room.{$second->id},.message.sent");
 });
 
 // ---------------------------------------------------------------- notifies

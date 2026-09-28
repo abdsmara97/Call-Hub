@@ -44,8 +44,10 @@ it('subscribes to every room the user belongs to, not just the open one', functi
 
     $listeners = array_keys($method->invoke($component->instance()));
 
-    expect($listeners)->toContain("echo-private:room.{$this->openRoom->id},.message.sent")
-        ->and($listeners)->toContain("echo-private:room.{$this->otherRoom->id},.message.sent");
+    $tenant = $this->me->tenant_id;
+
+    expect($listeners)->toContain("echo-private:tenant.{$tenant}.room.{$this->openRoom->id},.message.sent")
+        ->and($listeners)->toContain("echo-private:tenant.{$tenant}.room.{$this->otherRoom->id},.message.sent");
 });
 
 it('shows an unread count for a room the user is not looking at', function () {

@@ -26,6 +26,11 @@ beforeEach(function () {
     ]);
 
     Cache::flush();
+
+    // roomIdFrom() now verifies the parsed room really belongs to the parsed
+    // tenant, so the webhook only maps names of rooms that exist.
+    $this->room = \App\Models\Room::factory()->create();
+    $this->roomName = 'hub-room-'.$this->room->tenant_id.'-'.$this->room->getKey();
 });
 
 /**
@@ -64,12 +69,14 @@ function postWebhook(array $body, array $overrides = [], ?string $rawOverride = 
     );
 }
 
-function joinEvent(int $userId = 12, string $sid = 'PA_first', int $roomId = 7): array
+function joinEvent(int $userId = 12, string $sid = 'PA_first', ?int $roomId = null): array
 {
+    $roomId ??= test()->room->getKey();
+
     return [
         'id' => 'evt-'.$sid.'-'.$userId,
         'event' => 'participant_joined',
-        'room' => ['name' => 'hub-room-'.$roomId, 'creationTime' => '1754236800'],
+        'room' => ['name' => 'hub-room-'.test()->room->tenant_id.'-'.$roomId, 'creationTime' => '1754236800'],
         'participant' => [
             'identity' => 'u'.$userId,
             'sid' => $sid,
@@ -121,16 +128,16 @@ it('marks a room live and broadcasts when a huddle starts', function () {
     postWebhook([
         'id' => 'evt-start',
         'event' => 'room_started',
-        'room' => ['name' => 'hub-room-7', 'creationTime' => '1754236800'],
+        'room' => ['name' => $this->roomName, 'creationTime' => '1754236800'],
     ])->assertOk();
 
-    Event::assertDispatched(HuddleUpdated::class, fn ($e) => $e->roomId === 7);
+    Event::assertDispatched(HuddleUpdated::class, fn ($e) => $e->roomId === $this->room->getKey());
 });
 
 it('records a participant from the token metadata alone', function () {
     postWebhook(joinEvent())->assertOk();
 
-    $snapshot = app(HuddleRegistry::class)->snapshot(7);
+    $snapshot = app(HuddleRegistry::class)->snapshot($this->room->getKey());
 
     expect($snapshot['active'])->toBeTrue()
         ->and($snapshot['participant_count'])->toBe(1)
@@ -144,8 +151,13 @@ it('records a participant from the token metadata alone', function () {
  * five seconds must not be fifty rounds of User, Room and room_members queries —
  * which is exactly why the name and avatar are signed into the token and read
  * back off the webhook rather than looked up.
+ *
+ * The tenant boundary added exactly two indexed lookups per event, both O(1)
+ * and neither per-participant: roomIdFrom() verifying the room really belongs
+ * to the tenant in the name, and the broadcast channel name resolving the
+ * room's tenant. Pinned so a third query is still a regression.
  */
-it('handles a join without querying the database', function () {
+it('handles a join with only the two tenant-fence lookups', function () {
     $queries = 0;
     DB::listen(function () use (&$queries) {
         $queries++;
@@ -153,7 +165,7 @@ it('handles a join without querying the database', function () {
 
     postWebhook(joinEvent())->assertOk();
 
-    expect($queries)->toBe(0);
+    expect($queries)->toBe(2);
 })->skip(
     fn () => config('cache.default') === 'database',
     'The database cache store issues queries of its own; run with an array or redis cache.'
@@ -175,11 +187,11 @@ it('ignores a departure for a session that has already been replaced', function 
     postWebhook([
         'id' => 'evt-late-left',
         'event' => 'participant_left',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
         'participant' => ['identity' => 'u12', 'sid' => 'PA_first'],
     ])->assertOk();
 
-    expect(app(HuddleRegistry::class)->snapshot(7)['participant_count'])->toBe(1);
+    expect(app(HuddleRegistry::class)->snapshot($this->room->getKey())['participant_count'])->toBe(1);
 });
 
 it('removes a participant when the current session leaves', function () {
@@ -189,11 +201,11 @@ it('removes a participant when the current session leaves', function () {
     postWebhook([
         'id' => 'evt-left-13',
         'event' => 'participant_left',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
         'participant' => ['identity' => 'u13', 'sid' => 'PA_other'],
     ])->assertOk();
 
-    expect(app(HuddleRegistry::class)->snapshot(7)['participant_count'])->toBe(1);
+    expect(app(HuddleRegistry::class)->snapshot($this->room->getKey())['participant_count'])->toBe(1);
 });
 
 /*
@@ -207,15 +219,15 @@ it('clears the huddle the moment the last participant leaves', function () {
     postWebhook([
         'id' => 'evt-left-last',
         'event' => 'participant_left',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
         'participant' => ['identity' => 'u12', 'sid' => 'PA_first'],
     ])->assertOk();
 
-    $snapshot = app(HuddleRegistry::class)->snapshot(7);
+    $snapshot = app(HuddleRegistry::class)->snapshot($this->room->getKey());
 
     expect($snapshot['active'])->toBeFalse()
         ->and($snapshot['participant_count'])->toBe(0)
-        ->and(app(HuddleRegistry::class)->liveRoomIds())->not->toContain(7);
+        ->and(app(HuddleRegistry::class)->liveRoomIds())->not->toContain($this->room->getKey());
 });
 
 it('clears the huddle when the room finishes', function () {
@@ -224,10 +236,10 @@ it('clears the huddle when the room finishes', function () {
     postWebhook([
         'id' => 'evt-finished',
         'event' => 'room_finished',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
     ])->assertOk();
 
-    expect(app(HuddleRegistry::class)->snapshot(7)['active'])->toBeFalse();
+    expect(app(HuddleRegistry::class)->snapshot($this->room->getKey())['active'])->toBeFalse();
 });
 
 /*
@@ -238,7 +250,7 @@ it('accepts an event type it does not handle', function () {
     postWebhook([
         'id' => 'evt-track',
         'event' => 'track_published',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
     ])->assertOk();
 });
 
@@ -256,12 +268,12 @@ it('processes a repeated event id only once', function () {
     postWebhook([
         'id' => 'evt-PA_first-12', // same id as the join above
         'event' => 'participant_left',
-        'room' => ['name' => 'hub-room-7'],
+        'room' => ['name' => $this->roomName],
         'participant' => ['identity' => 'u12', 'sid' => 'PA_first'],
     ])->assertOk();
 
     // The retry was dropped, so the participant is still there.
-    expect(app(HuddleRegistry::class)->snapshot(7)['participant_count'])->toBe(1);
+    expect(app(HuddleRegistry::class)->snapshot($this->room->getKey())['participant_count'])->toBe(1);
 });
 
 it('needs no session, no csrf token and no authenticated user', function () {

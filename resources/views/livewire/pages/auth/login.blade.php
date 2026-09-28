@@ -57,5 +57,11 @@ new #[Layout('layouts.guest')] class extends Component
         </div>
 
         <x-primary-button class="w-full">Sign in</x-primary-button>
+
+        <p class="text-center text-sm text-content-muted">
+            New organisation?
+            <a href="{{ route('signup') }}" wire:navigate
+               class="font-medium text-brand-text hover:underline">Create a workspace</a>
+        </p>
     </form>
 </div>

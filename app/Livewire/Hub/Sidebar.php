@@ -51,8 +51,10 @@ class Sidebar extends Component
          * moves until something else happens to re-render the sidebar — which
          * is the whole case unread counts exist for.
          */
+        $tenantId = auth()->user()->tenant_id;
+
         foreach ($this->joinedRoomIds() as $roomId) {
-            $listeners["echo-private:room.{$roomId},.message.sent"] = 'onRoomMessage';
+            $listeners["echo-private:tenant.{$tenantId}.room.{$roomId},.message.sent"] = 'onRoomMessage';
         }
 
         return $listeners;

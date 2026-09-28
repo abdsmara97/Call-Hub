@@ -6,6 +6,7 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
+use App\Support\BroadcastChannels;
 
 /**
  * The state of a room's huddle changed.
@@ -35,7 +36,7 @@ class HuddleUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('room.'.$this->roomId)];
+        return [new PrivateChannel(BroadcastChannels::roomId($this->roomId))];
     }
 
     public function broadcastAs(): string

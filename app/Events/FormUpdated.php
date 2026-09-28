@@ -8,6 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 /**
  * Fires when a form is sent somewhere, answered or closed, so a room watching
@@ -30,7 +31,7 @@ class FormUpdated implements ShouldBroadcastNow
             ? [$this->roomId]
             : $this->form->postings()->pluck('room_id')->all();
 
-        return array_map(fn ($id) => new PrivateChannel('room.'.$id), $rooms);
+        return array_map(fn ($id) => new PrivateChannel(BroadcastChannels::roomId($id)), $rooms);
     }
 
     public function broadcastAs(): string

@@ -15,9 +15,12 @@ use App\Livewire\Admin\FormBuilder;
 use App\Livewire\Admin\FormManager;
 use App\Livewire\Admin\FormResponses;
 use App\Livewire\Admin\HubSettings;
+use App\Livewire\Admin\Invitations;
 use App\Livewire\Admin\MisuseReport;
 use App\Livewire\Admin\UserImport;
 use App\Livewire\Admin\UserManager;
+use App\Livewire\Auth\AcceptInvitation;
+use App\Livewire\Auth\RegisterWorkspace;
 use App\Livewire\Auth\RotatePassword;
 use App\Livewire\Directory;
 use App\Livewire\Hub\FormFill;
@@ -28,6 +31,16 @@ use App\Livewire\SavedMessages;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/hub');
+
+/*
+ * Self-serve entry points. Signup creates a whole workspace (tenant); an
+ * invitation link is how staff join an existing one. Both are guest routes —
+ * the token, not a session, is what authorises an acceptance.
+ */
+Route::middleware('guest')->group(function () {
+    Route::get('signup', RegisterWorkspace::class)->name('signup');
+    Route::get('invitations/{token}', AcceptInvitation::class)->name('invitations.accept');
+});
 
 Route::middleware('auth')->group(function () {
     // Reachable while `must_change_password` is set; everything else is not.
@@ -89,6 +102,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
         Route::get('users', UserManager::class)->name('users');
+        Route::get('users/invitations', Invitations::class)->name('invitations');
         Route::get('users/import', UserImport::class)->name('import');
         Route::get('users/import/template', EmployeeImportTemplateController::class)
             ->name('import.template');

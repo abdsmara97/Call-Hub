@@ -4,9 +4,11 @@ An internal communication hub for Saai: team messaging, direct
 messages, and an emergency alert system that reaches people wherever they are in
 the app — including when the tab is in the background.
 
-Built for a single organisation of roughly 1,000 accounts across several
-companies and administrations. There is no public sign-up; accounts exist only
-because an administrator created or imported them.
+Multi-tenant: each customer signs up for a **workspace** (a tenant) at
+`/signup` and organises it into companies and administrations — sized for
+roughly 1,000 accounts per workspace. Staff accounts are never self-created:
+they exist only because a workspace administrator invited (`Admin →
+Invitations`), created, or imported them.
 
 ---
 
@@ -279,7 +281,7 @@ notifications**.
 |---|---|
 | Framework | Laravel 12 on PHP 8.2 |
 | UI | Livewire 3 + Volt, Blade, Tailwind, Vite |
-| Auth | Breeze (Livewire stack), registration removed |
+| Auth | Breeze (Livewire stack); workspace signup + invitations, no open staff registration |
 | Roles | `spatie/laravel-permission` — global `admin` / `employee` |
 | Real time | Reverb + Echo |
 | Calls | WebRTC, peer-to-peer; Cloudflare Realtime TURN for relay |
@@ -445,6 +447,39 @@ Five things are easy to get wrong:
    sustained packet forwarding burns the CPU credit and the machine is throttled
    — which presents as the huddle going choppy and the whole site slowing at the
    same moment, and is miserable to diagnose. `n2-standard-4` or better.
+
+### Multi-tenant operation
+
+**One stack serves every customer.** A single Reverb cluster, a single LiveKit
+deployment, one Horizon/queue fleet and one database carry all tenants; a new
+customer is a row created by signup at `/signup`, never a new VM, database, or
+process. Nothing in `deploy/` is duplicated per customer.
+
+Isolation is carried in the names and the schema, not in separate
+infrastructure:
+
+- **Reverb** — channels are tenant-scoped (`tenant.{id}.room.{room}`,
+  `tenant.{id}.presence.room.{room}`, `tenant.{id}.presence.online`) and every
+  authorisation callback in `routes/channels.php` refuses a socket whose user
+  belongs to a different tenant before membership is even considered. The
+  single shared `REVERB_APP_ID` / `REVERB_APP_KEY` / `REVERB_APP_SECRET` is
+  intentional: the boundary lives at channel authorisation, not at the
+  Reverb-app layer.
+- **LiveKit** — room names carry the tenant (`hub-room-{tenant}-{room}`), and
+  the webhook's name-to-room mapping refuses a name whose tenant segment does
+  not match the room it claims.
+- **Database and search** — every directly-queried table carries `tenant_id`
+  under a global Eloquent scope bound from the authenticated user, and the
+  Scout message index carries `tenant_id` so search is cut per customer before
+  any room-membership intersection.
+
+**Scaling shared infrastructure.** The warnings above change blast radius, not
+nature, under multi-tenancy: Reverb is still tier 1 (item 2), but an outage is
+now an outage *for every customer at once*, and a LiveKit restart (item 4) ends
+every tenant's huddles in the same instant. Alert thresholds and maintenance
+windows should be set for the whole customer base, not for one workspace — and
+the file-descriptor note in `deploy/supervisor/oaktree-reverb.conf` now sizes
+against the sum of all tenants' accounts.
 
 ### Queues
 

@@ -5,6 +5,7 @@
      */
     $adminLinks = [
         ['route' => 'admin.users', 'label' => 'Users', 'icon' => 'users'],
+        ['route' => 'admin.invitations', 'label' => 'Invitations', 'icon' => 'at-symbol'],
         ['route' => 'admin.import', 'label' => 'Import', 'icon' => 'upload'],
         ['route' => 'admin.forms', 'label' => 'Forms', 'icon' => 'document'],
         ['route' => 'admin.emergency-log', 'label' => 'Emergency log', 'icon' => 'alert'],

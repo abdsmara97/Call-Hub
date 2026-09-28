@@ -167,6 +167,6 @@ class Room extends Model
 
     public function broadcastChannelName(): string
     {
-        return 'room.'.$this->getKey();
+        return \App\Support\BroadcastChannels::room($this);
     }
 }

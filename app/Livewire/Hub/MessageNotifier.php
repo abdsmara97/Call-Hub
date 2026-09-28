@@ -26,8 +26,10 @@ class MessageNotifier extends Component
 
         // Same subscription set as the sidebar: every room the user belongs to,
         // not just the one on screen.
+        $tenantId = auth()->user()->tenant_id;
+
         foreach ($this->joinedRoomIds() as $roomId) {
-            $listeners["echo-private:room.{$roomId},.message.sent"] = 'onMessage';
+            $listeners["echo-private:tenant.{$tenantId}.room.{$roomId},.message.sent"] = 'onMessage';
         }
 
         return $listeners;

@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 class MessageDeleted implements ShouldBroadcastNow
 {
@@ -16,7 +17,7 @@ class MessageDeleted implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('room.'.$this->roomId)];
+        return [new PrivateChannel(BroadcastChannels::roomId($this->roomId))];
     }
 
     public function broadcastAs(): string

@@ -140,8 +140,10 @@ it('reports an inactive snapshot for a room with no huddle', function () {
 });
 
 it('broadcasts on the room private channel that already gates membership', function () {
-    $event = new HuddleUpdated(7, ['room_id' => 7]);
+    $room = \App\Models\Room::factory()->create();
 
-    expect($event->broadcastOn()[0]->name)->toBe('private-room.7')
+    $event = new HuddleUpdated($room->id, ['room_id' => $room->id]);
+
+    expect($event->broadcastOn()[0]->name)->toBe("private-tenant.{$room->tenant_id}.room.{$room->id}")
         ->and($event->broadcastAs())->toBe('huddle.updated');
 });

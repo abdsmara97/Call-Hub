@@ -8,6 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BroadcastChannels;
 
 class EmergencyResolved implements ShouldBroadcastNow
 {
@@ -27,7 +28,7 @@ class EmergencyResolved implements ShouldBroadcastNow
         );
 
         if ($this->emergency->room_id) {
-            $channels[] = new PrivateChannel('room.'.$this->emergency->room_id);
+            $channels[] = new PrivateChannel(BroadcastChannels::roomId($this->emergency->room_id));
         }
 
         return $channels;

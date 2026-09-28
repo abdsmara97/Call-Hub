@@ -211,7 +211,7 @@ it('signs the grants a participant is allowed and no others', function () {
     $claims = app(HuddleTokens::class)->verify($response->json('token'));
 
     expect($claims->sub)->toBe('u'.$this->alice->getKey())
-        ->and($claims->video->room)->toBe('hub-room-'.$this->room->getKey())
+        ->and($claims->video->room)->toBe('hub-room-'.$this->room->tenant_id.'-'.$this->room->getKey())
         ->and($claims->video->roomJoin)->toBeTrue()
         ->and($claims->video->canPublish)->toBeTrue()
         // The banner renders the name and avatar we signed here, and reads them
