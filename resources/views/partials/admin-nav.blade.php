@@ -11,6 +11,7 @@
         ['route' => 'admin.emergency-log', 'label' => 'Emergency log', 'icon' => 'alert'],
         ['route' => 'admin.misuse', 'label' => 'Misuse', 'icon' => 'chart'],
         ['route' => 'admin.settings', 'label' => 'Settings', 'icon' => 'cog'],
+        ['route' => 'admin.billing', 'label' => 'Billing', 'icon' => 'chart'],
         ['route' => 'admin.broadcast', 'label' => 'Broadcast', 'icon' => 'megaphone'],
     ];
 @endphp

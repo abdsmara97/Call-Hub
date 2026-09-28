@@ -12,13 +12,13 @@ class EmergencyPolicy
     /** Any employee may raise an emergency in a room they belong to. */
     public function sendInRoom(User $user, Room $room): bool
     {
-        return $user->belongsToRoom($room);
+        return $this->tenantHasEmergencySystem($user) && $user->belongsToRoom($room);
     }
 
     /** Company / administration / everyone broadcasts are administrator-only. */
     public function broadcast(User $user): bool
     {
-        return $user->can(Permissions::BROADCAST_EMERGENCY);
+        return $this->tenantHasEmergencySystem($user) && $user->can(Permissions::BROADCAST_EMERGENCY);
     }
 
     public function view(User $user, Emergency $emergency): bool
@@ -53,5 +53,16 @@ class EmergencyPolicy
     public function export(User $user): bool
     {
         return $user->can(Permissions::VIEW_EMERGENCY_LOG);
+    }
+
+    /**
+     * The billing gate applies only to *raising* emergencies. Viewing the
+     * log, acknowledging, and resolving stay available on a lapsed plan —
+     * an audit trail that disappears when a card expires would be worse
+     * than no gate at all.
+     */
+    private function tenantHasEmergencySystem(User $user): bool
+    {
+        return $user->tenant?->hasEmergencyAddon() ?? true;
     }
 }

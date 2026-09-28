@@ -21,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
          * instead of leaking one tenant's context into the next.
          */
         $this->app->scoped(TenantContext::class);
+
+        // The paying customer is the Tenant, not an individual User.
+        \Laravel\Cashier\Cashier::useCustomerModel(\App\Models\Tenant::class);
     }
 
     /**

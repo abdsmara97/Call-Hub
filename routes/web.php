@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CallCredentialController;
 use App\Http\Controllers\CallSignalController;
 use App\Http\Controllers\EmergencyLogExportController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\FormAnswerFileController;
 use App\Http\Controllers\HuddleTokenController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\StartDirectMessageController;
+use App\Livewire\Admin\Billing;
 use App\Livewire\Admin\EmergencyBroadcast;
 use App\Livewire\Admin\EmergencyLog;
 use App\Livewire\Admin\FormBuilder;
@@ -117,6 +119,10 @@ Route::middleware('auth')->group(function () {
         Route::get('emergency-log/export', EmergencyLogExportController::class)->name('emergency-log.export');
         Route::get('misuse', MisuseReport::class)->name('misuse');
         Route::get('settings', HubSettings::class)->name('settings');
+
+        Route::get('billing', Billing::class)->name('billing');
+        Route::get('billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
+        Route::get('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
     });
 });
 
